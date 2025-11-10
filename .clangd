@@ -1,0 +1,26 @@
+CompileFlags:
+  Add:
+    - -std=c++17
+    - -DUNICODE
+    - -D_UNICODE
+    - -DQT_QML_LIB
+    - -DQT_WIDGETS_LIB
+    - -DQT_GUI_LIB
+    - -DQT_CORE_LIB
+    - -D__MINGW64__
+    - -Wno-typedef-redefinition
+    - -ID:/Qt/6.8.1/mingw_64/include
+    - -ID:/Qt/6.8.1/mingw_64/include/QtCore
+    - -ID:/Qt/6.8.1/mingw_64/include/QtGui
+    - -ID:/Qt/6.8.1/mingw_64/include/QtWidgets
+    - -ID:/Qt/6.8.1/mingw_64/include/QtQml
+    - -ID:/Qt/Tools/mingw1310_64/lib/gcc/x86_64-w64-mingw32/13.1.0/include/c++
+    - -ID:/Qt/Tools/mingw1310_64/lib/gcc/x86_64-w64-mingw32/13.1.0/include/c++/x86_64-w64-mingw32
+    - -ID:/Qt/Tools/mingw1310_64/lib/gcc/x86_64-w64-mingw32/13.1.0/include/c++/backward
+    - --target=x86_64-w64-mingw32
+Diagnostics:
+  UnusedIncludes: None
+  MissingIncludes: None
+  Suppress:
+    - typedef-redefinition
+

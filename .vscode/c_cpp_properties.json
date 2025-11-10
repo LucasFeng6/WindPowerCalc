@@ -1,0 +1,27 @@
+{
+    "version": 4,
+    "configurations": [
+      {
+        "name": "MinGW-Qt-6.8.1",
+        "compilerPath": "D:\\Qt\\Tools\\mingw1310_64\\bin\\g++.exe",
+        "cStandard": "c11",
+        "cppStandard": "c++17",
+        "intelliSenseMode": "windows-gcc-x64",
+        "includePath": [
+          "${workspaceFolder}",
+          "D:\\Qt\\6.8.1\\mingw_64\\include",
+          "D:\\Qt\\6.8.1\\mingw_64\\include\\QtCore",
+          "D:\\Qt\\6.8.1\\mingw_64\\include\\QtGui",
+          "D:\\Qt\\6.8.1\\mingw_64\\include\\QtWidgets"
+        ],
+        "defines": [
+          "UNICODE",
+          "_UNICODE",
+          "QT_WIDGETS_LIB",
+          "QT_GUI_LIB",
+          "QT_CORE_LIB"
+        ]
+      }
+    ]
+  }
+  

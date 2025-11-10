@@ -1,0 +1,78 @@
+{
+    "version": "2.0.0",
+    "tasks": [
+      {
+        "label": "qmake: Debug (shadow)",
+        "type": "shell",
+        "command": "powershell",
+        "args": [
+          "-NoProfile",
+          "-Command",
+          "if(-not (Test-Path '${workspaceFolder}\\build-debug')){ New-Item -ItemType Directory -Path '${workspaceFolder}\\build-debug' -Force | Out-Null }; $pro=(Get-ChildItem -Path '${workspaceFolder}' -Filter *.pro | Select -First 1).FullName; if(-not $pro){ throw '未找到 .pro 文件'; }; Set-Location '${workspaceFolder}\\build-debug'; & 'D:\\Qt\\6.8.1\\mingw_64\\bin\\qmake.exe' -spec win32-g++ 'CONFIG+=debug' $pro"
+        ],
+        "options": {
+          "env": {
+            "Path": "D:\\Qt\\Tools\\mingw1310_64\\bin;D:\\Qt\\6.8.1\\mingw_64\\bin;${env:Path}"
+          }
+        },
+        "problemMatcher": "$gcc",
+        "group": "build"
+      },
+      {
+        "label": "make: Debug",
+        "type": "shell",
+        "command": "D:\\Qt\\Tools\\mingw1310_64\\bin\\mingw32-make.exe",
+        "args": [],
+        "options": {
+          "cwd": "${workspaceFolder}\\build-debug",
+          "env": {
+            "Path": "D:\\Qt\\Tools\\mingw1310_64\\bin;D:\\Qt\\6.8.1\\mingw_64\\bin;${env:Path}"
+          }
+        },
+        "problemMatcher": "$gcc",
+        "group": {
+          "kind": "build",
+          "isDefault": true
+        },
+        "dependsOn": ["qmake: Debug (shadow)"]
+      },
+      {
+        "label": "make: Debug (fast)",
+        "type": "shell",
+        "command": "D:\\Qt\\Tools\\mingw1310_64\\bin\\mingw32-make.exe",
+        "args": [],
+        "options": {
+          "cwd": "${workspaceFolder}\\build-debug",
+          "env": {
+            "Path": "D:\\Qt\\Tools\\mingw1310_64\\bin;D:\\Qt\\6.8.1\\mingw_64\\bin;${env:Path}"
+          }
+        },
+        "problemMatcher": "$gcc",
+        "group": "build"
+      },
+      {
+        "label": "clean: Debug",
+        "type": "shell",
+        "command": "D:\\Qt\\Tools\\mingw1310_64\\bin\\mingw32-make.exe",
+        "args": ["clean"],
+        "options": {
+          "cwd": "${workspaceFolder}\\build-debug",
+          "env": {
+            "Path": "D:\\Qt\\Tools\\mingw1310_64\\bin;D:\\Qt\\6.8.1\\mingw_64\\bin;${env:Path}"
+          }
+        },
+        "problemMatcher": "$gcc"
+      },
+    {
+      "label": "Open in Qt Designer (auto pick first .ui)",
+      "type": "shell",
+      "command": "powershell",
+      "args": [
+        "-NoProfile",
+        "-Command",
+        "$ui=(Get-ChildItem -Path '${workspaceFolder}' -Filter *.ui -Recurse | Select -First 1).FullName; if(-not $ui){ throw '未找到 .ui 文件'; }; & 'D:\\Qt\\6.8.1\\mingw_64\\bin\\designer.exe' $ui"
+      ]
+    }
+  ]
+}
+  

@@ -1,0 +1,4 @@
+# Ignore build and cache directories
+build-debug/
+build/
+.cache/
