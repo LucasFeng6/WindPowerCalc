@@ -10,7 +10,7 @@
 struct InputField {
     QString name;
     QString label;
-    QString type;     // "double" | "int" | "enum" | "bool" | "text"
+    QString type;     // "double" | "int" 
     QString unit;     // e.g. "km", "Ω/km"
     QVariant defval;
     bool required = false;

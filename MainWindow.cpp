@@ -37,7 +37,7 @@ MainWindow::MainWindow(QWidget* parent): QMainWindow(parent) {
 }
 
 void MainWindow::initUi() {
-    setWindowTitle(u8"方案管理器（规格驱动 + 汇总）");
+    setWindowTitle(u8"海上风电全生命周期费用计算");
 
     // 工具栏
     auto* tb = addToolBar(u8"工具");
@@ -70,6 +70,11 @@ void MainWindow::initUi() {
     auto* schemeLabel = new QLabel(u8"方案列表", leftPanel);
     schemeLabel->setStyleSheet("font-weight: bold; padding: 5px;");
     schemesList_ = new QListWidget(leftPanel);
+    QFont listFont = schemesList_->font();  //
+    listFont.setPointSize(listFont.pointSize() + 2); // 放大字体
+    schemesList_->setFont(listFont);
+    schemesList_->setStyleSheet("QListWidget::item { height: 36px; }"); // 增高每个项
+    schemesList_->setSpacing(2);    //
     leftLayout->addWidget(schemeLabel);
     leftLayout->addWidget(schemesList_);
     leftPanel->setLayout(leftLayout);
@@ -81,13 +86,17 @@ void MainWindow::initUi() {
     projectModel_ = new QStandardItemModel(this);
     buildProjectModel();
     projectView_->setModel(projectModel_);
+    projectView_->expandAll(); // ensure everything is expanded after the model is bound
     projectView_->header()->setStretchLastSection(true);
+    projectView_->setColumnWidth(0, 320); // 第一列：项目
+    projectView_->setColumnWidth(1, 100); // 第二列：摘要/状态
     projectView_->setAlternatingRowColors(true);
     projectView_->setRootIsDecorated(true);
     projectView_->setEditTriggers(QAbstractItemView::NoEditTriggers);
     connect(projectView_->selectionModel(), &QItemSelectionModel::currentChanged, this, &MainWindow::onProjectSelectionChanged);
 
     editor_ = new EditorPanel(hSplit);
+    editor_->setMinimumWidth(400);
     connect(editor_, &EditorPanel::inputsChanged, this, &MainWindow::onEditChanged);
 
     hSplit->setStretchFactor(0,1); // schemes list
