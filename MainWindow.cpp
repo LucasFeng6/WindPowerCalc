@@ -116,14 +116,14 @@ void MainWindow::initUi() {
 
 void MainWindow::buildProjectModel() {
     projectModel_->clear();
-    projectModel_->setHorizontalHeaderLabels({u8"项目", u8"摘要 / 状态"});
+    projectModel_->setHorizontalHeaderLabels({u8"项目", u8"小计 / 状态"});
 
     // 定义层级结构
     // 初期投资分类的组
-    QStringList initialInvestGroups = {u8"变电部分", u8"海上变电部分", u8"陆上变电部分", 
+    QStringList initialInvestGroups = {u8"海上变电部分", u8"陆上变电部分", 
                                         u8"线路部分", u8"其他设备", u8"其他费用"};
     // 年运行费分类的组
-    QStringList annualCostGroups = {u8"维护费", u8"停运损失费", u8"海域租赁费"};
+    QStringList annualCostGroups = {u8"损耗费用", u8"维护费", u8"停运损失费", u8"海域租赁费"};
     
     // 二级分组（需要缩进显示的）
     QStringList subGroups = {u8"海上变电部分", u8"陆上变电部分"};
@@ -161,9 +161,6 @@ void MainWindow::buildProjectModel() {
         if (!p) continue;
         
         QString displayName = s.label;
-        if (!s.unit.isEmpty()) {
-            displayName += QString("（%1）").arg(s.unit);
-        }
         
         // 如果是二级分组，添加缩进
         if (subGroups.contains(s.group)) {
@@ -205,9 +202,6 @@ void MainWindow::buildProjectModel() {
         if (!p) continue;
         
         QString displayName = s.label;
-        if (!s.unit.isEmpty()) {
-            displayName += QString("（%1）").arg(s.unit);
-        }
         
         auto* nameIt = new QStandardItem(displayName);
         nameIt->setData(i);
@@ -427,9 +421,9 @@ void MainWindow::rebuildResultBody() {
     resultModel_->removeRows(0, resultModel_->rowCount());
     
     // 定义分类
-    QStringList initialInvestGroups = {u8"变电部分", u8"海上变电部分", u8"陆上变电部分", 
+    QStringList initialInvestGroups = {u8"海上变电部分", u8"陆上变电部分", 
                                         u8"线路部分", u8"其他设备", u8"其他费用"};
-    QStringList annualCostGroups = {u8"维护费", u8"停运损失费", u8"海域租赁费"};
+    QStringList annualCostGroups = {u8"损耗费用", u8"维护费", u8"停运损失费", u8"海域租赁费"};
     
     QVector<double> initialInvestTotals(schemes_.size(), 0.0);  // 初期投资总计
     QVector<double> annualCostTotals(schemes_.size(), 0.0);     // 年费用总计
@@ -742,9 +736,9 @@ void MainWindow::onExportCsv() {
     out << headers.join(",") << "\n";
     
     // 定义分类
-    QStringList initialInvestGroups = {u8"变电部分", u8"海上变电部分", u8"陆上变电部分", 
+    QStringList initialInvestGroups = {u8"海上变电部分", u8"陆上变电部分", 
                                         u8"线路部分", u8"其他设备", u8"其他费用"};
-    QStringList annualCostGroups = {u8"维护费", u8"停运损失费", u8"海域租赁费"};
+    QStringList annualCostGroups = {u8"损耗费用", u8"维护费", u8"停运损失费", u8"海域租赁费"};
     
     QVector<double> initialInvestTotals(schemes_.size(), 0.0);
     QVector<double> annualCostTotals(schemes_.size(), 0.0);

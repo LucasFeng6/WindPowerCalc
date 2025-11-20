@@ -6,8 +6,8 @@
 
 static const char* kEmbeddedSpec = R"JSON(
 {
-  "groups": ["变电部分", "海上变电部分", "陆上变电部分", "线路部分", "其他设备", "其他费用", 
-             "维护费", "停运损失费", "海域租赁费"],
+  "groups": ["海上变电部分", "陆上变电部分", "线路部分", "其他设备", "其他费用",
+             "损耗费用", "维护费", "停运损失费", "海域租赁费"],
   "items": [
     { "id":"offshore_converter", "group":"海上变电部分", "label":"海上换流站", "unit":"万元", "inputs":[
         {"name":"capex","label":"海上换流站","type":"double","unit":"万元","required":false,"defval":0}
@@ -43,7 +43,7 @@ static const char* kEmbeddedSpec = R"JSON(
         {"name":"unit_price","label":"单价","type":"double","unit":"万元/km","required":false,"defval":0},
         {"name":"length","label":"长度","type":"double","unit":"km","required":false,"defval":0}
       ],
-      "formula":"result = unit_price * length;" },
+      "formula":"result = (unit_price+100) * length;" },
 
     { "id":"other_equipment", "group":"其他设备", "label":"其他设备", "unit":"万元", "inputs":[
         {"name":"capex","label":"其他设备","type":"double","unit":"万元","required":false,"defval":0}
@@ -55,35 +55,68 @@ static const char* kEmbeddedSpec = R"JSON(
       ],
       "formula":"result = capex;" },
 
-    { "id":"om_offshore", "group":"维护费", "label":"海上变电设备维护费", "unit":"万元/年", "inputs":[
-        {"name":"annual_om_cost","label":"海上变电设备维护费","type":"double","unit":"万元/年","required":false,"defval":0}
-      ],
-      "formula":"result = annual_om_cost;" },
-
-    { "id":"om_onshore", "group":"维护费", "label":"陆上变电设备维护费", "unit":"万元/年", "inputs":[
-        {"name":"annual_om_cost","label":"陆上变电设备维护费","type":"double","unit":"万元/年","required":false,"defval":0}
-      ],
-      "formula":"result = annual_om_cost;" },
-
-    { "id":"downtime_cable", "group":"停运损失费", "label":"海缆故障停运", "unit":"万元/年", "inputs":[
-        {"name":"util_hours","label":"年利用小时数","type":"double","unit":"h","required":false,"defval":0},
+    { "id":"loss_dc_cable", "group":"损耗费用", "label":"直流海缆损耗", "unit":"万元/年", "inputs":[
+        {"name":"resistance","label":"电阻","type":"double","unit":"Ω/km","required":false,"defval":0},
+        {"name":"current","label":"电流","type":"double","unit":"A","required":false,"defval":0},
         {"name":"length","label":"长度","type":"double","unit":"km","required":false,"defval":0},
-        {"name":"terminals","label":"终端数量","type":"int","unit":"个","required":false,"defval":0},
-        {"name":"avg_power","label":"年平均功率","type":"double","unit":"MW","required":false,"defval":0},
+        {"name":"circuits","label":"回路数","type":"int","unit":"回","required":false,"defval":0},
+        {"name":"loss_hours","label":"损耗小时数","type":"double","unit":"h","required":false,"defval":0},
         {"name":"price","label":"电价","type":"double","unit":"元/kWh","required":false,"defval":0}
       ],
-      "formula":"result = util_hours * length * terminals * avg_power * price / 10000.0;" },
+      "formula":"result = resistance*current*current*length*circuits*loss_hours*price/1000.0/10000.0;" },
+
+    { "id":"loss_ac_cable", "group":"损耗费用", "label":"交流海缆损耗", "unit":"万元/年", "inputs":[
+        {"name":"resistance","label":"电阻","type":"double","unit":"Ω/km","required":false,"defval":0},
+        {"name":"current","label":"电流","type":"double","unit":"A","required":false,"defval":0},
+        {"name":"length","label":"长度","type":"double","unit":"km","required":false,"defval":0},
+        {"name":"circuits","label":"回路数","type":"int","unit":"回","required":false,"defval":0},
+        {"name":"loss_hours","label":"损耗小时数","type":"double","unit":"h","required":false,"defval":0},
+        {"name":"price","label":"电价","type":"double","unit":"元/kWh","required":false,"defval":0}
+      ],
+      "formula":"result = resistance*current*current*length*circuits*loss_hours*price/1000.0/10000.0;" },
+
+    { "id":"loss_converter", "group":"损耗费用", "label":"变电/换流损耗", "unit":"万元/年", "inputs":[
+        {"name":"transformer_capacity","label":"变压器输送容量","type":"double","unit":"kW","required":false,"defval":0},
+        {"name":"valve_capacity","label":"换流阀输送容量","type":"double","unit":"kW","required":false,"defval":0},
+        {"name":"loss_hours","label":"损耗小时数","type":"double","unit":"h","required":false,"defval":0},
+        {"name":"price","label":"电价","type":"double","unit":"元/kWh","required":false,"defval":0}
+      ],
+      "formula":"result = (transformer_capacity + valve_capacity) * loss_hours * price / 10000.0;" },
+
+    { "id":"loss_reactor", "group":"损耗费用", "label":"高抗损耗", "unit":"万元/年", "inputs":[
+        {"name":"charge_power","label":"充电功率","type":"double","unit":"kW","required":false,"defval":0},
+        {"name":"loss_hours","label":"损耗小时数","type":"double","unit":"h","required":false,"defval":0},
+        {"name":"price","label":"电价","type":"double","unit":"元/kWh","required":false,"defval":0}
+      ],
+      "formula":"result = charge_power * loss_hours * price / 10000.0;" },
+
+    { "id":"om_substation_equipment", "group":"维护费", "label":"变电设备维护费", "unit":"万元/年", "inputs":[
+        {"name":"offshore_om","label":"海上变电设备维护费","type":"double","unit":"万元/年","required":false,"defval":0},
+        {"name":"onshore_om","label":"陆上变电设备维护费","type":"double","unit":"万元/年","required":false,"defval":0}
+      ],
+      "formula":"result = offshore_om + onshore_om;" },
+
+    { "id":"downtime_cable", "group":"停运损失费", "label":"海缆故障停运", "unit":"万元/年", "inputs":[
+        {"name":"util_hours","label":"故障维修时长","type":"double","unit":"h","required":false,"defval":0},
+        {"name":"length","label":"海缆长度","type":"double","unit":"km","required":false,"defval":0},
+        {"name":"terminals","label":"终端数量","type":"int","unit":"个","required":false,"defval":0},
+        {"name":"avg_power","label":"年平均功率","type":"double","unit":"kW","required":false,"defval":0},
+        {"name":"price","label":"电价","type":"double","unit":"元/kWh","required":false,"defval":0}
+      ],
+      "formula":"result = (0.03*length/100 + 0.007*terminals/100 + 0.0705*length/100)*avg_power*util_hours*price/10000.0;" },
 
     { "id":"downtime_equipment", "group":"停运损失费", "label":"设备故障停运", "unit":"万元/年", "inputs":[
-        {"name":"avg_power","label":"年平均功率","type":"double","unit":"MW","required":false,"defval":0}
+        {"name":"avg_power","label":"年平均功率","type":"double","unit":"kW","required":false,"defval":0},
+        {"name":"price","label":"电价","type":"double","unit":"元/kWh","required":false,"defval":0}
       ],
-      "formula":"result = avg_power;" },
+      "formula":"result = avg_power*44*price/10000.0 ;" },
 
     { "id":"downtime_maintenance", "group":"停运损失费", "label":"设备计划检修停运", "unit":"万元/年", "inputs":[
         {"name":"avg_power","label":"年平均功率","type":"double","unit":"MW","required":false,"defval":0},
-        {"name":"maint_hours","label":"维修时长","type":"double","unit":"h","required":false,"defval":0}
+        {"name":"maint_hours","label":"维修时长","type":"double","unit":"h","required":false,"defval":0},
+        {"name":"price","label":"电价","type":"double","unit":"元/kWh","required":false,"defval":0}
       ],
-      "formula":"result = avg_power * maint_hours;" },
+      "formula":"result = avg_power*maint_hours*price/10000.0;" },
 
     { "id":"rent_cable", "group":"海域租赁费", "label":"线路年海域使用费", "unit":"万元/年", "inputs":[
         {"name":"length","label":"长度","type":"double","unit":"km","required":false,"defval":0},
