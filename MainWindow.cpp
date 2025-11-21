@@ -1,4 +1,4 @@
-#include "MainWindow.h"
+﻿#include "MainWindow.h"
 #include "SpecLoader.h"
 #include "EditorPanel.h"
 
@@ -27,6 +27,7 @@
 #include <QVBoxLayout>
 #include <QLineEdit>
 #include <QStatusBar>
+#include <cmath>
 
 MainWindow::MainWindow(QWidget* parent): QMainWindow(parent) {
     spec_ = SpecLoader::loadDefault();
@@ -299,7 +300,7 @@ void MainWindow::onProjectSelectionChanged() {
     const QModelIndex idx = projectView_->currentIndex();
     const ProjectSpec* spec = projectSpecFromIndex(idx);
     if (!spec) {
-        editor_->setProject(ProjectSpec(), {});
+        editor_->setProject(ProjectSpec(), QMap<QString,QVariant>(), QMap<QString,QVariant>());
         return;
     }
     
@@ -307,7 +308,7 @@ void MainWindow::onProjectSelectionChanged() {
     if (!sch) return;
     
     const auto& inputs = sch->inputs.value(spec->id);
-    editor_->setProject(*spec, inputs);
+    editor_->setProject(*spec, inputs, sch->sharedInputs);
     
     // 更新此行的摘要
     if (idx.isValid()) {
@@ -320,7 +321,6 @@ void MainWindow::onProjectSelectionChanged() {
         }
     }
 }
-
 void MainWindow::onEditChanged() {
     const QModelIndex idx = projectView_->currentIndex();
     const ProjectSpec* spec = projectSpecFromIndex(idx);
@@ -331,32 +331,57 @@ void MainWindow::onEditChanged() {
     
     QString err;
     QMap<QString, QVariant> inputs;
-    if (!editor_->collectInputs(inputs, &err)) {
+    QMap<QString, QVariant> sharedInputs;
+    if (!editor_->collectInputs(inputs, sharedInputs, &err)) {
         // 有错误，但不阻止用户继续编辑
         return;
     }
     
     // 保存输入
     sch->inputs[spec->id] = inputs;
-    
-    // 计算结果
-    double result = 0.0;
-    QString explain;
-    if (calc_.evaluate(*spec, inputs, result, &explain)) {
-        sch->results[spec->id] = result;
-    } else {
-        sch->results.remove(spec->id);
+    for (auto it = sharedInputs.begin(); it != sharedInputs.end(); ++it) {
+        sch->sharedInputs[it.key()] = it.value();
+    }
+
+    auto mergedInputs = [&](const QString& projId) {
+        QMap<QString,QVariant> all = sch->sharedInputs;
+        const auto own = sch->inputs.value(projId);
+        for (auto it = own.begin(); it != own.end(); ++it) {
+            all[it.key()] = it.value();
+        }
+        return all;
+    };
+
+    // 当前项目重新计算
+    {
+        double result = 0.0;
+        QString explain;
+        const auto allInputs = mergedInputs(spec->id);
+        if (calc_.evaluate(*spec, allInputs, result, &explain)) {
+            sch->results[spec->id] = result;
+        } else {
+            sch->results.remove(spec->id);
+        }
+    }
+
+    // Recompute others after shared inputs change
+    for (const auto& s : spec_.items) {
+        if (s.id == spec->id) continue;
+        const auto own = sch->inputs.value(s.id);
+        if (own.isEmpty()) continue;
+        double result = 0.0;
+        QString explain;
+        const auto allInputs = mergedInputs(s.id);
+        if (calc_.evaluate(s, allInputs, result, &explain)) {
+            sch->results[s.id] = result;
+        } else {
+            sch->results.remove(s.id);
+        }
     }
     
     // 刷新摘要
-    if (idx.isValid()) {
-        QStandardItem* item = projectModel_->itemFromIndex(idx);
-        if (item) {
-            int rowId = item->data().toInt();
-            if (rowId >= 0 && rowId < spec_.items.size()) {
-                refreshProjectSummaryRow(rowId);
-            }
-        }
+    for (int i = 0; i < spec_.items.size(); ++i) {
+        refreshProjectSummaryRow(i);
     }
 }
 
@@ -561,6 +586,19 @@ void MainWindow::rebuildResultBody() {
     }
     
     // ========== 总计行 ==========
+    QVector<double> annualFeeTotals(schemes_.size(), 0.0);
+    const double recoveryRate = 0.05;
+    const double serviceYears = 30.0;
+    const double powTerm = std::pow(1.0 + recoveryRate, serviceYears);
+    const double denominator = powTerm - 1.0;
+    double annuityFactor = 0.0;
+    if (std::abs(denominator) > 1e-9) {
+        annuityFactor = (recoveryRate * powTerm) / denominator;
+    }
+    for (int i = 0; i < schemes_.size(); ++i) {
+        annualFeeTotals[i] = initialInvestTotals[i] * annuityFactor + annualCostTotals[i];
+    }
+    
     auto addTotalRow = [this](const QString& label, const QString& unit, 
                               const QVector<double>& totals, const QColor& bgColor) {
         QList<QStandardItem*> totalRow;
@@ -596,14 +634,7 @@ void MainWindow::rebuildResultBody() {
     addTotalRow(u8"初期投资", u8"万元", initialInvestTotals, QColor(255, 255, 200));
     
     // 年费用总计
-    addTotalRow(u8"年费用", u8"万元/年", annualCostTotals, QColor(255, 220, 200));
-    
-    // 全生命周期总投资（占位：初期投资 + 年费用）
-    QVector<double> lifeCycleTotals(schemes_.size());
-    for (int i = 0; i < schemes_.size(); ++i) {
-        lifeCycleTotals[i] = initialInvestTotals[i] + annualCostTotals[i];
-    }
-    addTotalRow(u8"全生命周期总投资（占位）", u8"万元", lifeCycleTotals, QColor(200, 255, 200));
+    addTotalRow(u8"年费用", u8"万元/年", annualFeeTotals, QColor(255, 220, 200));
 }
 
 void MainWindow::setStatusInfo(const QString& msg) {
@@ -636,6 +667,12 @@ void MainWindow::onSave() {
             resultsObj[it.key()] = it.value();
         }
         schObj["results"] = resultsObj;
+
+        QJsonObject sharedObj;
+        for (auto it = sch.sharedInputs.begin(); it != sch.sharedInputs.end(); ++it) {
+            sharedObj[it.key()] = QJsonValue::fromVariant(it.value());
+        }
+        schObj["sharedInputs"] = sharedObj;
         
         schemesArr.append(schObj);
     }
@@ -693,6 +730,11 @@ void MainWindow::onLoad() {
                 inputs[it2.key()] = it2.value().toVariant();
             }
             sch.inputs[it.key()] = inputs;
+        }
+        
+        QJsonObject sharedObj = schObj.value("sharedInputs").toObject();
+        for (auto it = sharedObj.begin(); it != sharedObj.end(); ++it) {
+            sch.sharedInputs[it.key()] = it.value().toVariant();
         }
         
         QJsonObject resultsObj = schObj.value("results").toObject();
@@ -804,6 +846,19 @@ void MainWindow::onExportCsv() {
     // 总计行
     out << "\n";
     
+    QVector<double> annualFeeTotals(schemes_.size(), 0.0);
+    const double recoveryRate = 0.05;
+    const double serviceYears = 30.0;
+    const double powTerm = std::pow(1.0 + recoveryRate, serviceYears);
+    const double denominator = powTerm - 1.0;
+    double annuityFactor = 0.0;
+    if (std::abs(denominator) > 1e-9) {
+        annuityFactor = (recoveryRate * powTerm) / denominator;
+    }
+    for (int i = 0; i < schemes_.size(); ++i) {
+        annualFeeTotals[i] = initialInvestTotals[i] * annuityFactor + annualCostTotals[i];
+    }
+    
     QStringList initTotalRow;
     initTotalRow << u8"初期投资" << u8"万元";
     for (int i = 0; i < schemes_.size(); ++i) {
@@ -814,16 +869,9 @@ void MainWindow::onExportCsv() {
     QStringList annualTotalRow;
     annualTotalRow << u8"年费用" << u8"万元/年";
     for (int i = 0; i < schemes_.size(); ++i) {
-        annualTotalRow << QString::number(annualCostTotals[i], 'f', 2);
+        annualTotalRow << QString::number(annualFeeTotals[i], 'f', 2);
     }
     out << annualTotalRow.join(",") << "\n";
-    
-    QStringList lifeCycleRow;
-    lifeCycleRow << u8"全生命周期总投资（占位）" << u8"万元";
-    for (int i = 0; i < schemes_.size(); ++i) {
-        lifeCycleRow << QString::number(initialInvestTotals[i] + annualCostTotals[i], 'f', 2);
-    }
-    out << lifeCycleRow.join(",") << "\n";
     
     file.close();
     setStatusInfo(u8"已导出CSV");

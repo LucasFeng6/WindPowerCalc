@@ -1,4 +1,4 @@
-#ifndef EDITORPANEL_H
+﻿#ifndef EDITORPANEL_H
 #define EDITORPANEL_H
 
 #include "Spec.h"
@@ -16,13 +16,15 @@ class QLabel;
 class EditorPanel : public QWidget {
     Q_OBJECT
 public:
+    // Switch to given project spec and populate inputs (defaults if empty)
     explicit EditorPanel(QWidget* parent=nullptr);
 
-    // 切换到指定项目规格，并以给定 inputs 填充（为空则用默认值）
-    void setProject(const ProjectSpec& spec, const QMap<QString,QVariant>& curInputs);
+    // Set current project spec and inputs; sharedInputs used for fields with sharedKey
+    void setProject(const ProjectSpec& spec, const QMap<QString,QVariant>& curInputs,
+                    const QMap<QString,QVariant>& sharedInputs);
 
-    // 读取当前表单内容为 inputs；返回校验是否通过，err 若非空带出错误信息
-    bool collectInputs(QMap<QString,QVariant>& out, QString* err=nullptr) const;
+    // Read current form inputs, split into own vs shared; return false if validation fails
+    bool collectInputs(QMap<QString,QVariant>& ownOut, QMap<QString,QVariant>& sharedOut, QString* err=nullptr) const;
 
 signals:
     void inputsChanged(); // 用户编辑后发出
@@ -33,6 +35,7 @@ private:
         QWidget* w = nullptr;
         QLabel*  unitLabel = nullptr;
     };
+    QMap<QString,QVariant> sharedValues_;
     QVector<FieldWidget> fields_;
     QFormLayout* form_ = nullptr;
     QLabel* title_ = nullptr;

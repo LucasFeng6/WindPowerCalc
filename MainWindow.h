@@ -18,6 +18,7 @@ struct Scheme {
     QString name;
     QMap<QString, QMap<QString,QVariant>> inputs; // projId -> (field -> value)
     QMap<QString, double> results;                // projId -> result
+    QMap<QString, QVariant> sharedInputs;         // sharedKey -> value
 };
 
 class MainWindow : public QMainWindow {

@@ -1,4 +1,5 @@
 #include "EditorPanel.h"
+
 #include <QFormLayout>
 #include <QLabel>
 #include <QSpinBox>
@@ -55,6 +56,7 @@ void EditorPanel::clearForm() {
         if (auto* w = item->widget()) w->deleteLater();
         delete item;
     }
+    sharedValues_.clear();
     fields_.clear();
 }
 
@@ -85,20 +87,28 @@ QWidget* EditorPanel::makeWidget(const InputField& f, const QVariant& def) const
         sp->setMaximumWidth(220);
         sp->setSizePolicy(QSizePolicy::Preferred, QSizePolicy::Fixed);
         w = sp;
-    } 
+    }
     return w;
 }
 
-void EditorPanel::setProject(const ProjectSpec& spec, const QMap<QString,QVariant>& curInputs) {
+void EditorPanel::setProject(const ProjectSpec& spec, const QMap<QString,QVariant>& curInputs,
+                             const QMap<QString,QVariant>& sharedInputs) {
     clearForm();
-    title_->setText(QString(u8"<b>%1</b>（结果单位：%2）").arg(spec.label, spec.unit));
+    sharedValues_ = sharedInputs;
+    if (!spec.label.isEmpty()) {
+        title_->setText(QString(u8"<b>%1</b>（%2）").arg(spec.label, spec.unit));
+    } else {
+        title_->setText(u8"<b>请选择左侧项目</b>");
+    }
     note_->setText(spec.note);
 
     for (const auto& f : spec.inputs) {
         auto* row = new QWidget(this);
         auto* hl = new QHBoxLayout(row);
         hl->setContentsMargins(0,0,0,0);
-        QVariant def = curInputs.value(f.name, f.defval);
+        const QVariant def = f.sharedKey.isEmpty()
+                             ? curInputs.value(f.name, f.defval)
+                             : sharedInputs.value(f.sharedKey, f.defval);
         QWidget* w = makeWidget(f, def);
         auto* unitLabel = new QLabel(f.unit, row);
         unitLabel->setMinimumWidth(80);
@@ -106,6 +116,7 @@ void EditorPanel::setProject(const ProjectSpec& spec, const QMap<QString,QVarian
         hl->addWidget(w);
         hl->addWidget(unitLabel);
         row->setLayout(hl);
+
         auto* lbl = new QLabel(f.required ? (f.label + " *") : f.label, this);
         lbl->setMinimumHeight(32);
         form_->addRow(lbl, row);
@@ -113,38 +124,40 @@ void EditorPanel::setProject(const ProjectSpec& spec, const QMap<QString,QVarian
         FieldWidget fw; fw.f = f; fw.w = w; fw.unitLabel = unitLabel;
         fields_.push_back(fw);
 
-        // 变更即通知
         connect(w, &QWidget::destroyed, this, []{});
-        if (auto* sp = qobject_cast<QDoubleSpinBox*>(w)) 
+        if (auto* sp = qobject_cast<QDoubleSpinBox*>(w))
             connect(sp, qOverload<double>(&QDoubleSpinBox::valueChanged), this, &EditorPanel::inputsChanged);
-        if (auto* sp = qobject_cast<QSpinBox*>(w))       
+        if (auto* sp = qobject_cast<QSpinBox*>(w))
             connect(sp, qOverload<int>(&QSpinBox::valueChanged), this, &EditorPanel::inputsChanged);
-        
     }
 }
 
 QVariant EditorPanel::widgetValue(const FieldWidget& fw) const {
     if (auto* sp = qobject_cast<QDoubleSpinBox*>(fw.w)) return sp->value();
     if (auto* sp = qobject_cast<QSpinBox*>(fw.w))       return sp->value();
-
     return {};
 }
 
 bool EditorPanel::checkRequired(const FieldWidget& fw) const {
     if (!fw.f.required) return true;
     const QVariant v = widgetValue(fw);
-    double val = v.toDouble();
-    return val != 0.0;
+    return !qFuzzyIsNull(v.toDouble());
 }
 
-bool EditorPanel::collectInputs(QMap<QString,QVariant>& out, QString* err) const {
-    out.clear();
+bool EditorPanel::collectInputs(QMap<QString,QVariant>& ownOut, QMap<QString,QVariant>& sharedOut, QString* err) const {
+    ownOut.clear();
+    sharedOut.clear();
     for (const auto& fw : fields_) {
         if (!checkRequired(fw)) {
             if (err) *err = QString(u8"必填项未填写：%1").arg(fw.f.label);
             return false;
         }
-        out.insert(fw.f.name, widgetValue(fw));
+        const QVariant v = widgetValue(fw);
+        if (!fw.f.sharedKey.isEmpty()) {
+            sharedOut.insert(fw.f.sharedKey, v);
+        } else {
+            ownOut.insert(fw.f.name, v);
+        }
     }
     return true;
 }
