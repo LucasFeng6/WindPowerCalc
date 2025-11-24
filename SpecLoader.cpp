@@ -81,10 +81,10 @@ static const char* kEmbeddedSpec = R"JSON(
         {"name":"loss_hours","label":"损耗小时数","type":"double","unit":"h","required":false,"defval":0},
         {"name":"price","label":"电价","type":"double","unit":"元/kWh","required":false,"defval":0,"sharedKey":"price"}
       ],
-      "formula":"result = (transformer_capacity*0.03 *2 + valve_capacity*0.08)*loss_hours*price/10.0 ;" },
+      "formula":"result = (transformer_capacity*0.003 *2 + valve_capacity*0.008)*loss_hours*price/10.0 ;" },
 
     { "id":"loss_reactor", "group":"损耗费用", "label":"高抗损耗", "unit":"万元/年", "inputs":[
-        {"name":"charge_power","label":"充电功率","type":"double","unit":"kW","required":false,"defval":0},
+        {"name":"charge_power","label":"充电功率","type":"double","unit":"Mvar","required":false,"defval":0},
         {"name":"loss_hours","label":"损耗小时数","type":"double","unit":"h","required":false,"defval":0},
         {"name":"price","label":"电价","type":"double","unit":"元/kWh","required":false,"defval":0,"sharedKey":"price"}
       ],
@@ -100,23 +100,23 @@ static const char* kEmbeddedSpec = R"JSON(
         {"name":"util_hours","label":"故障维修时长","type":"double","unit":"h","required":false,"defval":0},
         {"name":"length","label":"海缆长度","type":"double","unit":"km","required":false,"defval":0},
         {"name":"terminals","label":"终端数量","type":"int","unit":"个","required":false,"defval":0},
-        {"name":"avg_power","label":"年平均功率","type":"double","unit":"kW","required":false,"defval":0},
+        {"name":"avg_power","label":"年平均功率","type":"double","unit":"MW","required":false,"defval":0},
         {"name":"price","label":"电价","type":"double","unit":"元/kWh","required":false,"defval":0,"sharedKey":"price"}
       ],
-      "formula":"result = (0.03*length/100 + 0.007*terminals/100 + 0.0705*length/100)*avg_power*util_hours*price/10000.0;" },
+      "formula":"result = (0.03*length/100 + 0.007*terminals/100 + 0.0705*length/100)*avg_power*util_hours*price/10.0;" },
 
     { "id":"downtime_equipment", "group":"停运损失费", "label":"设备故障停运", "unit":"万元/年", "inputs":[
-        {"name":"avg_power","label":"年平均功率","type":"double","unit":"kW","required":false,"defval":0},
+        {"name":"avg_power","label":"年平均功率","type":"double","unit":"MW","required":false,"defval":0},
         {"name":"price","label":"电价","type":"double","unit":"元/kWh","required":false,"defval":0,"sharedKey":"price"}
       ],
-      "formula":"result = avg_power*44*price/10000.0 ;" },
+      "formula":"result = avg_power*44*price/10.0 ;" },
 
     { "id":"downtime_maintenance", "group":"停运损失费", "label":"设备计划检修停运", "unit":"万元/年", "inputs":[
         {"name":"avg_power","label":"年平均功率","type":"double","unit":"MW","required":false,"defval":0},
         {"name":"maint_hours","label":"计划检修时长","type":"double","unit":"h","required":false,"defval":0},
         {"name":"price","label":"电价","type":"double","unit":"元/kWh","required":false,"defval":0,"sharedKey":"price"}
       ],
-      "formula":"result = avg_power*maint_hours*price/10000.0;" },
+      "formula":"result = avg_power*maint_hours*price/10.0;" },
 
     { "id":"rent_cable", "group":"海域租赁费", "label":"线路年海域使用费", "unit":"万元/年", "inputs":[
         {"name":"dc_length","label":"直流海缆长度","type":"double","unit":"km","required":false,"defval":0},
@@ -125,13 +125,13 @@ static const char* kEmbeddedSpec = R"JSON(
         {"name":"ac_width","label":"交流用海宽度","type":"double","unit":"m","required":false,"defval":0},
         {"name":"unit_fee","label":"单公顷费用","type":"double","unit":"万元/年","required":false,"defval":0}
       ],
-      "formula":"result = (dc_length*dc_width + ac_length*dc_width) * unit_fee / 10.0;" },
+      "formula":"result = (dc_length*dc_width + ac_length*ac_width) * unit_fee / 10.0;" },
 
     { "id":"rent_equipment", "group":"海域租赁费", "label":"设备年海域使用费", "unit":"万元/年", "inputs":[
         {"name":"area","label":"面积","type":"double","unit":"m²","required":false,"defval":0},
         {"name":"unit_fee","label":"单公顷费用","type":"double","unit":"万元/年","required":false,"defval":0}
       ],
-      "formula":"result = area * unit_fee / 10.0;" }
+      "formula":"result = area * unit_fee / 10000.0;" }
   ]
 }
 )JSON";

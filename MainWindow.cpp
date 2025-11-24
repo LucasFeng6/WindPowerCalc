@@ -91,7 +91,7 @@ void MainWindow::initUi() {
     projectView_->header()->setStretchLastSection(true);
     projectView_->setColumnWidth(0, 320); // 第一列：项目
     projectView_->setColumnWidth(1, 100); // 第二列：摘要/状态
-    projectView_->setAlternatingRowColors(true);
+    projectView_->setAlternatingRowColors(false);
     projectView_->setRootIsDecorated(true);
     projectView_->setEditTriggers(QAbstractItemView::NoEditTriggers);
     connect(projectView_->selectionModel(), &QItemSelectionModel::currentChanged, this, &MainWindow::onProjectSelectionChanged);
@@ -107,7 +107,7 @@ void MainWindow::initUi() {
     resultView_ = new QTableView(vSplit);
     resultModel_ = new QStandardItemModel(this);
     resultView_->setModel(resultModel_);
-    resultView_->horizontalHeader()->setStretchLastSection(true);
+    resultView_->horizontalHeader()->setStretchLastSection(false);
     resultView_->verticalHeader()->setVisible(false);
     resultView_->setAlternatingRowColors(true);
 
@@ -118,6 +118,8 @@ void MainWindow::initUi() {
 void MainWindow::buildProjectModel() {
     projectModel_->clear();
     projectModel_->setHorizontalHeaderLabels({u8"项目", u8"小计 / 状态"});
+    const QBrush groupRowBg(QColor(235, 235, 235));
+    const QBrush projectRowBg(Qt::white);
 
     // 定义层级结构
     // 初期投资分类的组
@@ -147,7 +149,9 @@ void MainWindow::buildProjectModel() {
         if (initialInvestGroups.contains(g)) {
             auto* gItem0 = new QStandardItem(g);
             gItem0->setFlags(Qt::ItemIsEnabled | Qt::ItemIsSelectable);
+            gItem0->setBackground(groupRowBg);
             auto* gItem1 = new QStandardItem();
+            gItem1->setBackground(groupRowBg);
             projectModel_->appendRow({gItem0, gItem1});
             groupNodes[g] = gItem0;
         }
@@ -170,7 +174,9 @@ void MainWindow::buildProjectModel() {
         
         auto* nameIt = new QStandardItem(displayName);
         nameIt->setData(i);
+        nameIt->setBackground(projectRowBg);
         auto* summary = new QStandardItem(u8"未填写");
+        summary->setBackground(projectRowBg);
         p->appendRow({nameIt, summary});
     }
     
@@ -188,7 +194,9 @@ void MainWindow::buildProjectModel() {
         if (annualCostGroups.contains(g)) {
             auto* gItem0 = new QStandardItem(g);
             gItem0->setFlags(Qt::ItemIsEnabled | Qt::ItemIsSelectable);
+            gItem0->setBackground(groupRowBg);
             auto* gItem1 = new QStandardItem();
+            gItem1->setBackground(groupRowBg);
             projectModel_->appendRow({gItem0, gItem1});
             groupNodes[g] = gItem0;
         }
@@ -206,7 +214,9 @@ void MainWindow::buildProjectModel() {
         
         auto* nameIt = new QStandardItem(displayName);
         nameIt->setData(i);
+        nameIt->setBackground(projectRowBg);
         auto* summary = new QStandardItem(u8"未填写");
+        summary->setBackground(projectRowBg);
         p->appendRow({nameIt, summary});
     }
     
@@ -309,6 +319,7 @@ void MainWindow::onProjectSelectionChanged() {
     
     const auto& inputs = sch->inputs.value(spec->id);
     editor_->setProject(*spec, inputs, sch->sharedInputs);
+    editor_->focusFirstField();
     
     // 更新此行的摘要
     if (idx.isValid()) {
@@ -440,6 +451,11 @@ void MainWindow::rebuildResultHeader() {
         headers << sch.name;
     }
     resultModel_->setHorizontalHeaderLabels(headers);
+    resultView_->setColumnWidth(0, 200);
+    resultView_->setColumnWidth(1, 100);
+    for (int i = 2; i < headers.size(); ++i) {
+        resultView_->setColumnWidth(i, 150);
+    }
 }
 
 void MainWindow::rebuildResultBody() {

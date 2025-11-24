@@ -7,8 +7,6 @@
 
 class QFormLayout;
 class QLineEdit;
-class QSpinBox;
-class QDoubleSpinBox;
 class QComboBox;
 class QCheckBox;
 class QLabel;
@@ -26,6 +24,9 @@ public:
     // Read current form inputs, split into own vs shared; return false if validation fails
     bool collectInputs(QMap<QString,QVariant>& ownOut, QMap<QString,QVariant>& sharedOut, QString* err=nullptr) const;
 
+    // Focus the first editable field (if any)
+    void focusFirstField();
+
 signals:
     void inputsChanged(); // 用户编辑后发出
 
@@ -42,9 +43,13 @@ private:
     QLabel* note_ = nullptr;
 
     void clearForm();
-    QWidget* makeWidget(const InputField& f, const QVariant& def) const;
+    QWidget* makeWidget(const InputField& f, const QVariant& def, bool hasValue) const;
     QVariant widgetValue(const FieldWidget& fw) const;
     bool checkRequired(const FieldWidget& fw) const;
+    bool focusNextField(QLineEdit* current);
+
+protected:
+    bool eventFilter(QObject* obj, QEvent* event) override;
 };
 
 
