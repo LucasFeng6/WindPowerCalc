@@ -37,7 +37,7 @@ private slots:
     void onGenerate();
     void onSave();
     void onLoad();
-    void onExportCsv();
+    void onExportExcel();
 
 private:
     // UI
