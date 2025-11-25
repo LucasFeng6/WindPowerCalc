@@ -25,7 +25,7 @@ bool Calculator::evaluate(const ProjectSpec& spec, const InputMap& inputs, doubl
         eng.globalObject().setProperty(it.key(), QJSValue(it.value().toDouble()));
         parts << QString("%1=%2").arg(it.key()).arg(it.value().toString());
     }
-    // 预置 result=0
+    // 预置 result=0，确保result属性存在
     eng.globalObject().setProperty("result", 0.0);
 
     const QString code = spec.formula;

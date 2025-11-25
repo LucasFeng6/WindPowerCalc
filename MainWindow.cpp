@@ -27,6 +27,9 @@
 #include <QVBoxLayout>
 #include <QLineEdit>
 #include <QStatusBar>
+#include <ActiveQt/QAxObject>
+#include <QDir>
+#include <cmath>
 
 MainWindow::MainWindow(QWidget* parent): QMainWindow(parent) {
     spec_ = SpecLoader::loadDefault();
@@ -46,7 +49,7 @@ void MainWindow::initUi() {
     actDel_ = tb->addAction(u8"删除方案");
     tb->addSeparator();
     actGen_ = tb->addAction(u8"生成汇总");
-    actExport_ = tb->addAction(u8"导出CSV");
+    actExport_ = tb->addAction(u8"导出Excel");
     tb->addSeparator();
     actSave_ = tb->addAction(u8"保存方案集");
     actLoad_ = tb->addAction(u8"加载方案集");
@@ -57,7 +60,7 @@ void MainWindow::initUi() {
     connect(actGen_, &QAction::triggered, this, &MainWindow::onGenerate);
     connect(actSave_, &QAction::triggered, this, &MainWindow::onSave);
     connect(actLoad_, &QAction::triggered, this, &MainWindow::onLoad);
-    connect(actExport_, &QAction::triggered, this, &MainWindow::onExportCsv);
+    connect(actExport_, &QAction::triggered, this, &MainWindow::onExportExcel);
 
     // 上半：分三列；下半：结果
     auto* vSplit = new QSplitter(Qt::Vertical, this);
@@ -90,7 +93,7 @@ void MainWindow::initUi() {
     projectView_->header()->setStretchLastSection(true);
     projectView_->setColumnWidth(0, 320); // 第一列：项目
     projectView_->setColumnWidth(1, 100); // 第二列：摘要/状态
-    projectView_->setAlternatingRowColors(true);
+    projectView_->setAlternatingRowColors(false);
     projectView_->setRootIsDecorated(true);
     projectView_->setEditTriggers(QAbstractItemView::NoEditTriggers);
     connect(projectView_->selectionModel(), &QItemSelectionModel::currentChanged, this, &MainWindow::onProjectSelectionChanged);
@@ -106,7 +109,7 @@ void MainWindow::initUi() {
     resultView_ = new QTableView(vSplit);
     resultModel_ = new QStandardItemModel(this);
     resultView_->setModel(resultModel_);
-    resultView_->horizontalHeader()->setStretchLastSection(true);
+    resultView_->horizontalHeader()->setStretchLastSection(false);
     resultView_->verticalHeader()->setVisible(false);
     resultView_->setAlternatingRowColors(true);
 
@@ -116,14 +119,16 @@ void MainWindow::initUi() {
 
 void MainWindow::buildProjectModel() {
     projectModel_->clear();
-    projectModel_->setHorizontalHeaderLabels({u8"项目", u8"摘要 / 状态"});
+    projectModel_->setHorizontalHeaderLabels({u8"项目", u8"小计 / 状态"});
+    const QBrush groupRowBg(QColor(235, 235, 235));
+    const QBrush projectRowBg(Qt::white);
 
     // 定义层级结构
     // 初期投资分类的组
-    QStringList initialInvestGroups = {u8"变电部分", u8"海上变电部分", u8"陆上变电部分", 
+    QStringList initialInvestGroups = {u8"海上变电部分", u8"陆上变电部分", 
                                         u8"线路部分", u8"其他设备", u8"其他费用"};
     // 年运行费分类的组
-    QStringList annualCostGroups = {u8"维护费", u8"停运损失费", u8"海域租赁费"};
+    QStringList annualCostGroups = {u8"损耗费用", u8"维护费", u8"停运损失费", u8"海域租赁费"};
     
     // 二级分组（需要缩进显示的）
     QStringList subGroups = {u8"海上变电部分", u8"陆上变电部分"};
@@ -146,7 +151,9 @@ void MainWindow::buildProjectModel() {
         if (initialInvestGroups.contains(g)) {
             auto* gItem0 = new QStandardItem(g);
             gItem0->setFlags(Qt::ItemIsEnabled | Qt::ItemIsSelectable);
+            gItem0->setBackground(groupRowBg);
             auto* gItem1 = new QStandardItem();
+            gItem1->setBackground(groupRowBg);
             projectModel_->appendRow({gItem0, gItem1});
             groupNodes[g] = gItem0;
         }
@@ -161,9 +168,6 @@ void MainWindow::buildProjectModel() {
         if (!p) continue;
         
         QString displayName = s.label;
-        if (!s.unit.isEmpty()) {
-            displayName += QString("（%1）").arg(s.unit);
-        }
         
         // 如果是二级分组，添加缩进
         if (subGroups.contains(s.group)) {
@@ -172,7 +176,9 @@ void MainWindow::buildProjectModel() {
         
         auto* nameIt = new QStandardItem(displayName);
         nameIt->setData(i);
+        nameIt->setBackground(projectRowBg);
         auto* summary = new QStandardItem(u8"未填写");
+        summary->setBackground(projectRowBg);
         p->appendRow({nameIt, summary});
     }
     
@@ -190,7 +196,9 @@ void MainWindow::buildProjectModel() {
         if (annualCostGroups.contains(g)) {
             auto* gItem0 = new QStandardItem(g);
             gItem0->setFlags(Qt::ItemIsEnabled | Qt::ItemIsSelectable);
+            gItem0->setBackground(groupRowBg);
             auto* gItem1 = new QStandardItem();
+            gItem1->setBackground(groupRowBg);
             projectModel_->appendRow({gItem0, gItem1});
             groupNodes[g] = gItem0;
         }
@@ -205,13 +213,12 @@ void MainWindow::buildProjectModel() {
         if (!p) continue;
         
         QString displayName = s.label;
-        if (!s.unit.isEmpty()) {
-            displayName += QString("（%1）").arg(s.unit);
-        }
         
         auto* nameIt = new QStandardItem(displayName);
         nameIt->setData(i);
+        nameIt->setBackground(projectRowBg);
         auto* summary = new QStandardItem(u8"未填写");
+        summary->setBackground(projectRowBg);
         p->appendRow({nameIt, summary});
     }
     
@@ -305,7 +312,7 @@ void MainWindow::onProjectSelectionChanged() {
     const QModelIndex idx = projectView_->currentIndex();
     const ProjectSpec* spec = projectSpecFromIndex(idx);
     if (!spec) {
-        editor_->setProject(ProjectSpec(), {});
+        editor_->setProject(ProjectSpec(), QMap<QString,QVariant>(), QMap<QString,QVariant>());
         return;
     }
     
@@ -313,7 +320,8 @@ void MainWindow::onProjectSelectionChanged() {
     if (!sch) return;
     
     const auto& inputs = sch->inputs.value(spec->id);
-    editor_->setProject(*spec, inputs);
+    editor_->setProject(*spec, inputs, sch->sharedInputs);
+    editor_->focusFirstField();
     
     // 更新此行的摘要
     if (idx.isValid()) {
@@ -326,7 +334,6 @@ void MainWindow::onProjectSelectionChanged() {
         }
     }
 }
-
 void MainWindow::onEditChanged() {
     const QModelIndex idx = projectView_->currentIndex();
     const ProjectSpec* spec = projectSpecFromIndex(idx);
@@ -337,32 +344,57 @@ void MainWindow::onEditChanged() {
     
     QString err;
     QMap<QString, QVariant> inputs;
-    if (!editor_->collectInputs(inputs, &err)) {
+    QMap<QString, QVariant> sharedInputs;
+    if (!editor_->collectInputs(inputs, sharedInputs, &err)) {
         // 有错误，但不阻止用户继续编辑
         return;
     }
     
     // 保存输入
     sch->inputs[spec->id] = inputs;
-    
-    // 计算结果
-    double result = 0.0;
-    QString explain;
-    if (calc_.evaluate(*spec, inputs, result, &explain)) {
-        sch->results[spec->id] = result;
-    } else {
-        sch->results.remove(spec->id);
+    for (auto it = sharedInputs.begin(); it != sharedInputs.end(); ++it) {
+        sch->sharedInputs[it.key()] = it.value();
+    }
+
+    auto mergedInputs = [&](const QString& projId) {
+        QMap<QString,QVariant> all = sch->sharedInputs;
+        const auto own = sch->inputs.value(projId);
+        for (auto it = own.begin(); it != own.end(); ++it) {
+            all[it.key()] = it.value();
+        }
+        return all;
+    };
+
+    // 当前项目重新计算
+    {
+        double result = 0.0;
+        QString explain;
+        const auto allInputs = mergedInputs(spec->id);
+        if (calc_.evaluate(*spec, allInputs, result, &explain)) {
+            sch->results[spec->id] = result;
+        } else {
+            sch->results.remove(spec->id);
+        }
+    }
+
+    // Recompute others after shared inputs change
+    for (const auto& s : spec_.items) {
+        if (s.id == spec->id) continue;
+        const auto own = sch->inputs.value(s.id);
+        if (own.isEmpty()) continue;
+        double result = 0.0;
+        QString explain;
+        const auto allInputs = mergedInputs(s.id);
+        if (calc_.evaluate(s, allInputs, result, &explain)) {
+            sch->results[s.id] = result;
+        } else {
+            sch->results.remove(s.id);
+        }
     }
     
     // 刷新摘要
-    if (idx.isValid()) {
-        QStandardItem* item = projectModel_->itemFromIndex(idx);
-        if (item) {
-            int rowId = item->data().toInt();
-            if (rowId >= 0 && rowId < spec_.items.size()) {
-                refreshProjectSummaryRow(rowId);
-            }
-        }
+    for (int i = 0; i < spec_.items.size(); ++i) {
+        refreshProjectSummaryRow(i);
     }
 }
 
@@ -421,15 +453,20 @@ void MainWindow::rebuildResultHeader() {
         headers << sch.name;
     }
     resultModel_->setHorizontalHeaderLabels(headers);
+    resultView_->setColumnWidth(0, 200);
+    resultView_->setColumnWidth(1, 100);
+    for (int i = 2; i < headers.size(); ++i) {
+        resultView_->setColumnWidth(i, 150);
+    }
 }
 
 void MainWindow::rebuildResultBody() {
     resultModel_->removeRows(0, resultModel_->rowCount());
     
     // 定义分类
-    QStringList initialInvestGroups = {u8"变电部分", u8"海上变电部分", u8"陆上变电部分", 
+    QStringList initialInvestGroups = {u8"海上变电部分", u8"陆上变电部分", 
                                         u8"线路部分", u8"其他设备", u8"其他费用"};
-    QStringList annualCostGroups = {u8"维护费", u8"停运损失费", u8"海域租赁费"};
+    QStringList annualCostGroups = {u8"损耗费用", u8"维护费", u8"停运损失费", u8"海域租赁费"};
     
     QVector<double> initialInvestTotals(schemes_.size(), 0.0);  // 初期投资总计
     QVector<double> annualCostTotals(schemes_.size(), 0.0);     // 年费用总计
@@ -567,6 +604,19 @@ void MainWindow::rebuildResultBody() {
     }
     
     // ========== 总计行 ==========
+    QVector<double> annualFeeTotals(schemes_.size(), 0.0);
+    const double recoveryRate = 0.05;
+    const double serviceYears = 30.0;
+    const double powTerm = std::pow(1.0 + recoveryRate, serviceYears);
+    const double denominator = powTerm - 1.0;
+    double annuityFactor = 0.0;
+    if (std::abs(denominator) > 1e-9) {
+        annuityFactor = (recoveryRate * powTerm) / denominator;
+    }
+    for (int i = 0; i < schemes_.size(); ++i) {
+        annualFeeTotals[i] = initialInvestTotals[i] * annuityFactor + annualCostTotals[i];
+    }
+    
     auto addTotalRow = [this](const QString& label, const QString& unit, 
                               const QVector<double>& totals, const QColor& bgColor) {
         QList<QStandardItem*> totalRow;
@@ -602,18 +652,11 @@ void MainWindow::rebuildResultBody() {
     addTotalRow(u8"初期投资", u8"万元", initialInvestTotals, QColor(255, 255, 200));
     
     // 年费用总计
-    addTotalRow(u8"年费用", u8"万元/年", annualCostTotals, QColor(255, 220, 200));
-    
-    // 全生命周期总投资（占位：初期投资 + 年费用）
-    QVector<double> lifeCycleTotals(schemes_.size());
-    for (int i = 0; i < schemes_.size(); ++i) {
-        lifeCycleTotals[i] = initialInvestTotals[i] + annualCostTotals[i];
-    }
-    addTotalRow(u8"全生命周期总投资（占位）", u8"万元", lifeCycleTotals, QColor(200, 255, 200));
+    addTotalRow(u8"年费用", u8"万元/年", annualFeeTotals, QColor(255, 220, 200));
 }
 
-void MainWindow::setStatusInfo(const QString& msg) {
-    statusBar()->showMessage(msg, 3000);
+void MainWindow::setStatusInfo(const QString& msg, int timeoutMs) {
+    statusBar()->showMessage(msg, timeoutMs);
 }
 
 void MainWindow::onSave() {
@@ -642,6 +685,12 @@ void MainWindow::onSave() {
             resultsObj[it.key()] = it.value();
         }
         schObj["results"] = resultsObj;
+
+        QJsonObject sharedObj;
+        for (auto it = sch.sharedInputs.begin(); it != sch.sharedInputs.end(); ++it) {
+            sharedObj[it.key()] = QJsonValue::fromVariant(it.value());
+        }
+        schObj["sharedInputs"] = sharedObj;
         
         schemesArr.append(schObj);
     }
@@ -701,6 +750,11 @@ void MainWindow::onLoad() {
             sch.inputs[it.key()] = inputs;
         }
         
+        QJsonObject sharedObj = schObj.value("sharedInputs").toObject();
+        for (auto it = sharedObj.begin(); it != sharedObj.end(); ++it) {
+            sch.sharedInputs[it.key()] = it.value().toVariant();
+        }
+        
         QJsonObject resultsObj = schObj.value("results").toObject();
         for (auto it = resultsObj.begin(); it != resultsObj.end(); ++it) {
             sch.results[it.key()] = it.value().toDouble();
@@ -719,119 +773,113 @@ void MainWindow::onLoad() {
     setStatusInfo(QString(u8"已加载 %1 个方案").arg(schemes_.size()));
 }
 
-void MainWindow::onExportCsv() {
-    QString path = QFileDialog::getSaveFileName(this, u8"导出CSV", "", "CSV (*.csv)");
-    if (path.isEmpty()) return;
-    
-    QFile file(path);
-    if (!file.open(QIODevice::WriteOnly | QIODevice::Text)) {
-        QMessageBox::warning(this, u8"错误", u8"无法写入文件");
+void MainWindow::onExportExcel() {
+    if (schemes_.isEmpty()) {   //
+        QMessageBox::information(this, u8"提示", u8"请先创建至少一个方案");
         return;
     }
-    
-    QTextStream out(&file);
-    // Qt 6 默认使用 UTF-8 编码，不再需要 setCodec()
-    out.setGenerateByteOrderMark(true);
-    
-    // 写表头
-    QStringList headers;
-    headers << u8"项目" << u8"单位";
-    for (const auto& sch : schemes_) {
-        headers << sch.name;
-    }
-    out << headers.join(",") << "\n";
-    
-    // 定义分类
-    QStringList initialInvestGroups = {u8"变电部分", u8"海上变电部分", u8"陆上变电部分", 
-                                        u8"线路部分", u8"其他设备", u8"其他费用"};
-    QStringList annualCostGroups = {u8"维护费", u8"停运损失费", u8"海域租赁费"};
-    
-    QVector<double> initialInvestTotals(schemes_.size(), 0.0);
-    QVector<double> annualCostTotals(schemes_.size(), 0.0);
-    
-    // 初期投资部分
-    out << u8"初期投资\n";
-    for (const auto& g : spec_.groupsInOrder) {
-        if (!initialInvestGroups.contains(g)) continue;
-        
-        out << QString(u8"【%1】").arg(g) << "\n";
-        
-        const auto& rows = spec_.groupRows.value(g);
-        for (int idx : rows) {
-            if (idx < 0 || idx >= spec_.items.size()) continue;
-            const auto& spec = spec_.items[idx];
-            
-            QStringList row;
-            row << spec.label << spec.unit;
-            
-            for (int i = 0; i < schemes_.size(); ++i) {
-                const auto& sch = schemes_[i];
-                if (sch.results.contains(spec.id)) {
-                    double val = sch.results[spec.id];
-                    row << QString::number(val, 'f', 2);
-                    initialInvestTotals[i] += val;
-                } else {
-                    row << "-";
-                }
-            }
-            out << row.join(",") << "\n";
-        }
-    }
-    
-    // 年运行费部分
-    out << u8"年运行费\n";
-    for (const auto& g : spec_.groupsInOrder) {
-        if (!annualCostGroups.contains(g)) continue;
-        
-        out << QString(u8"【%1】").arg(g) << "\n";
-        
-        const auto& rows = spec_.groupRows.value(g);
-        for (int idx : rows) {
-            if (idx < 0 || idx >= spec_.items.size()) continue;
-            const auto& spec = spec_.items[idx];
-            
-            QStringList row;
-            row << spec.label << spec.unit;
-            
-            for (int i = 0; i < schemes_.size(); ++i) {
-                const auto& sch = schemes_[i];
-                if (sch.results.contains(spec.id)) {
-                    double val = sch.results[spec.id];
-                    row << QString::number(val, 'f', 2);
-                    annualCostTotals[i] += val;
-                } else {
-                    row << "-";
-                }
-            }
-            out << row.join(",") << "\n";
-        }
-    }
-    
-    // 总计行
-    out << "\n";
-    
-    QStringList initTotalRow;
-    initTotalRow << u8"初期投资" << u8"万元";
-    for (int i = 0; i < schemes_.size(); ++i) {
-        initTotalRow << QString::number(initialInvestTotals[i], 'f', 2);
-    }
-    out << initTotalRow.join(",") << "\n";
-    
-    QStringList annualTotalRow;
-    annualTotalRow << u8"年费用" << u8"万元/年";
-    for (int i = 0; i < schemes_.size(); ++i) {
-        annualTotalRow << QString::number(annualCostTotals[i], 'f', 2);
-    }
-    out << annualTotalRow.join(",") << "\n";
-    
-    QStringList lifeCycleRow;
-    lifeCycleRow << u8"全生命周期总投资（占位）" << u8"万元";
-    for (int i = 0; i < schemes_.size(); ++i) {
-        lifeCycleRow << QString::number(initialInvestTotals[i] + annualCostTotals[i], 'f', 2);
-    }
-    out << lifeCycleRow.join(",") << "\n";
-    
-    file.close();
-    setStatusInfo(u8"已导出CSV");
-}
 
+    onGenerate();
+    if (resultModel_->columnCount() == 0) { //
+        QMessageBox::warning(this, u8"导出失败", u8"没有可以导出的数据");
+        return;
+    }
+
+    QString path = QFileDialog::getSaveFileName(this, u8"导出Excel", "", "Excel (*.xlsx)");
+    if (path.isEmpty()) return;
+    if (!path.endsWith(".xlsx", Qt::CaseInsensitive)) {
+        path += ".xlsx";
+    }
+
+    setStatusInfo(u8"导出中...", 0);
+    QApplication::processEvents();
+
+    QAxObject excel("Excel.Application");
+    if (excel.isNull()) {
+        QMessageBox::warning(this, u8"导出失败", u8"无法启动 Excel，请确认已经安装");
+        return;
+    }
+
+    excel.setProperty("Visible", false);
+    excel.setProperty("DisplayAlerts", false);
+
+    QAxObject* workbooks = nullptr;
+    QAxObject* workbook = nullptr;
+    QAxObject* sheet = nullptr;
+
+    auto cleanup = [&]() {
+        if (workbook) {
+            workbook->dynamicCall("Close(bool)", false);
+        }
+        if (!excel.isNull()) {
+            excel.dynamicCall("Quit()");
+        }
+        delete sheet;
+        delete workbook;
+        delete workbooks;
+        sheet = nullptr;
+        workbook = nullptr;
+        workbooks = nullptr;
+    };
+
+    workbooks = excel.querySubObject("Workbooks");
+    if (!workbooks) {
+        QMessageBox::warning(this, u8"导出失败", u8"无法创建 Excel 工作簿");
+        cleanup();
+        return;
+    }
+
+    workbooks->dynamicCall("Add()");
+    workbook = excel.querySubObject("ActiveWorkbook");
+    if (!workbook) {
+        QMessageBox::warning(this, u8"导出失败", u8"无法创建 Excel 工作簿");
+        cleanup();
+        return;
+    }
+
+    sheet = workbook->querySubObject("Worksheets(int)", 1);
+    if (!sheet) {
+        QMessageBox::warning(this, u8"导出失败", u8"无法创建 Excel 工作表");
+        cleanup();
+        setStatusInfo(u8"导出失败");
+        return;
+    }
+
+    const int rowCount = resultModel_->rowCount();
+    const int columnCount = resultModel_->columnCount();
+
+    auto writeCell = [&](int row, int col, const QVariant& value, bool bold = false) {
+        if (QAxObject* cell = sheet->querySubObject("Cells(int,int)", row, col)) {
+            cell->setProperty("Value", value);
+            if (bold) {
+                if (QAxObject* font = cell->querySubObject("Font")) {
+                    font->setProperty("Bold", true);
+                    delete font;
+                }
+            }
+            delete cell;
+        }
+    };
+
+    for (int c = 0; c < columnCount; ++c) {
+        writeCell(1, c + 1, resultModel_->headerData(c, Qt::Horizontal).toString(), true);
+    }
+
+    for (int r = 0; r < rowCount; ++r) {
+        for (int c = 0; c < columnCount; ++c) {
+            const QModelIndex idx = resultModel_->index(r, c);
+            writeCell(r + 2, c + 1, resultModel_->data(idx).toString());
+        }
+    }
+
+    if (QAxObject* columns = sheet->querySubObject("Columns")) {
+        columns->dynamicCall("AutoFit()");
+        delete columns;
+    }
+
+    workbook->dynamicCall("SaveAs(const QString&)", QDir::toNativeSeparators(path));
+    cleanup();
+
+    setStatusInfo(u8"已导出Excel");
+    QMessageBox::information(this, u8"导出成功", u8"成功导出到"+path);
+}

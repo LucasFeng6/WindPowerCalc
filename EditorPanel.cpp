@@ -1,27 +1,18 @@
 #include "EditorPanel.h"
+
 #include <QFormLayout>
 #include <QLabel>
-#include <QSpinBox>
-#include <QDoubleSpinBox>
+#include <QLineEdit>
 #include <QHBoxLayout>
+#include <QDoubleValidator>
 #include <QSizePolicy>
 #include <QFont>
 #include <QVariant>
 #include <QtGlobal>
+#include <QKeyEvent>
 #include <limits>
-
-namespace {
-class ZeroDefaultDoubleSpinBox : public QDoubleSpinBox {
-public:
-    explicit ZeroDefaultDoubleSpinBox(QWidget* parent = nullptr) : QDoubleSpinBox(parent) {}
-
-protected:
-    QString textFromValue(double value) const override {
-        if (qFuzzyIsNull(value)) return QStringLiteral("0");
-        return QDoubleSpinBox::textFromValue(value);
-    }
-};
-}
+#include <algorithm>
+#include <cmath>
 
 EditorPanel::EditorPanel(QWidget* parent): QWidget(parent) {
     auto* lay = new QVBoxLayout(this);
@@ -55,57 +46,66 @@ void EditorPanel::clearForm() {
         if (auto* w = item->widget()) w->deleteLater();
         delete item;
     }
+    sharedValues_.clear();
     fields_.clear();
 }
 
-QWidget* EditorPanel::makeWidget(const InputField& f, const QVariant& def) const {
-    QWidget* w = nullptr;
-    if (f.type == "double") {
-        auto* sp = new ZeroDefaultDoubleSpinBox;
-        sp->setRange(f.min, f.max);
-        sp->setDecimals(2);
-        sp->setValue(def.isValid() ? def.toDouble() : 0.0);
-        sp->setKeyboardTracking(false);
-        sp->setFixedHeight(32);
-        sp->setMinimumWidth(120);
-        sp->setMaximumWidth(220);
-        sp->setSizePolicy(QSizePolicy::Preferred, QSizePolicy::Fixed);
-        w = sp;
-    } else if (f.type == "int") {
-        auto* sp = new QSpinBox;
-        const double dMin = std::numeric_limits<double>::lowest();
-        const double dMax = std::numeric_limits<double>::max();
-        int minVal = (f.min == dMin) ? 0 : int(f.min);
-        int maxVal = (f.max == dMax) ? std::numeric_limits<int>::max() : int(f.max);
-        sp->setRange(minVal, maxVal);
-        sp->setValue(def.isValid() ? def.toInt() : 0);
-        sp->setKeyboardTracking(false);
-        sp->setFixedHeight(32);
-        sp->setMinimumWidth(120);
-        sp->setMaximumWidth(220);
-        sp->setSizePolicy(QSizePolicy::Preferred, QSizePolicy::Fixed);
-        w = sp;
-    } 
-    return w;
+QWidget* EditorPanel::makeWidget(const InputField& f, const QVariant& def, bool hasValue) const {
+    auto* edit = new QLineEdit;
+    edit->setAlignment(Qt::AlignRight | Qt::AlignVCenter);
+    edit->setFixedHeight(32);
+    edit->setMinimumWidth(120);
+    edit->setMaximumWidth(220);
+    edit->setSizePolicy(QSizePolicy::Preferred, QSizePolicy::Fixed);
+
+    auto* validator = new QDoubleValidator(edit);
+    const double minVal = std::max(0.0, f.min);
+    double maxVal = std::numeric_limits<double>::max();
+    if (std::isfinite(f.max) && f.max >= 0.0) {
+        maxVal = std::max(f.max, minVal);
+    }
+    validator->setRange(minVal, maxVal);
+    validator->setNotation(QDoubleValidator::StandardNotation);
+    validator->setDecimals(12);
+    edit->setValidator(validator);
+
+    if (hasValue && def.isValid()) {
+        edit->setText(def.toString());
+    }
+
+    edit->installEventFilter(const_cast<EditorPanel*>(this));
+    return edit;
 }
 
-void EditorPanel::setProject(const ProjectSpec& spec, const QMap<QString,QVariant>& curInputs) {
+void EditorPanel::setProject(const ProjectSpec& spec, const QMap<QString,QVariant>& curInputs,
+                             const QMap<QString,QVariant>& sharedInputs) {
     clearForm();
-    title_->setText(QString(u8"<b>%1</b>（结果单位：%2）").arg(spec.label, spec.unit));
+    sharedValues_ = sharedInputs;
+    if (!spec.label.isEmpty()) {
+        title_->setText(QString(u8"<b>%1</b>（%2）").arg(spec.label, spec.unit));
+    } else {
+        title_->setText(u8"<b>请选择左侧项目</b>");
+    }
     note_->setText(spec.note);
 
     for (const auto& f : spec.inputs) {
         auto* row = new QWidget(this);
         auto* hl = new QHBoxLayout(row);
         hl->setContentsMargins(0,0,0,0);
-        QVariant def = curInputs.value(f.name, f.defval);
-        QWidget* w = makeWidget(f, def);
+        const bool hasValue = f.sharedKey.isEmpty()
+                                  ? curInputs.contains(f.name)
+                                  : sharedInputs.contains(f.sharedKey);
+        const QVariant def = f.sharedKey.isEmpty()
+                             ? curInputs.value(f.name, f.defval)
+                             : sharedInputs.value(f.sharedKey, f.defval);
+        QWidget* w = makeWidget(f, def, hasValue);
         auto* unitLabel = new QLabel(f.unit, row);
         unitLabel->setMinimumWidth(80);
         unitLabel->setStyleSheet("color:gray");
         hl->addWidget(w);
         hl->addWidget(unitLabel);
         row->setLayout(hl);
+
         auto* lbl = new QLabel(f.required ? (f.label + " *") : f.label, this);
         lbl->setMinimumHeight(32);
         form_->addRow(lbl, row);
@@ -113,38 +113,80 @@ void EditorPanel::setProject(const ProjectSpec& spec, const QMap<QString,QVarian
         FieldWidget fw; fw.f = f; fw.w = w; fw.unitLabel = unitLabel;
         fields_.push_back(fw);
 
-        // 变更即通知
         connect(w, &QWidget::destroyed, this, []{});
-        if (auto* sp = qobject_cast<QDoubleSpinBox*>(w)) 
-            connect(sp, qOverload<double>(&QDoubleSpinBox::valueChanged), this, &EditorPanel::inputsChanged);
-        if (auto* sp = qobject_cast<QSpinBox*>(w))       
-            connect(sp, qOverload<int>(&QSpinBox::valueChanged), this, &EditorPanel::inputsChanged);
-        
+        if (auto* edit = qobject_cast<QLineEdit*>(w))
+            connect(edit, &QLineEdit::textChanged, this, &EditorPanel::inputsChanged);
     }
 }
 
 QVariant EditorPanel::widgetValue(const FieldWidget& fw) const {
-    if (auto* sp = qobject_cast<QDoubleSpinBox*>(fw.w)) return sp->value();
-    if (auto* sp = qobject_cast<QSpinBox*>(fw.w))       return sp->value();
-
+    if (auto* edit = qobject_cast<QLineEdit*>(fw.w)) return edit->text();
     return {};
 }
 
 bool EditorPanel::checkRequired(const FieldWidget& fw) const {
     if (!fw.f.required) return true;
     const QVariant v = widgetValue(fw);
-    double val = v.toDouble();
-    return val != 0.0;
+    return !v.toString().trimmed().isEmpty();
 }
 
-bool EditorPanel::collectInputs(QMap<QString,QVariant>& out, QString* err) const {
-    out.clear();
+bool EditorPanel::collectInputs(QMap<QString,QVariant>& ownOut, QMap<QString,QVariant>& sharedOut, QString* err) const {
+    ownOut.clear();
+    sharedOut.clear();
     for (const auto& fw : fields_) {
         if (!checkRequired(fw)) {
             if (err) *err = QString(u8"必填项未填写：%1").arg(fw.f.label);
             return false;
         }
-        out.insert(fw.f.name, widgetValue(fw));
+        const QString text = widgetValue(fw).toString().trimmed();
+        const QVariant v = text;
+        if (!fw.f.sharedKey.isEmpty()) {
+            sharedOut.insert(fw.f.sharedKey, v);
+        } else {
+            ownOut.insert(fw.f.name, v);
+        }
     }
     return true;
+}
+
+void EditorPanel::focusFirstField() {
+    for (const auto& fw : fields_) {
+        if (auto* edit = qobject_cast<QLineEdit*>(fw.w)) {
+            edit->setFocus(Qt::TabFocusReason);
+            edit->selectAll();
+            break;
+        }
+    }
+}
+
+bool EditorPanel::focusNextField(QLineEdit* current) {
+    if (!current) return false;
+    for (int i = 0; i < fields_.size(); ++i) {
+        if (fields_[i].w == current) {
+            for (int j = i + 1; j < fields_.size(); ++j) {
+                if (auto* edit = qobject_cast<QLineEdit*>(fields_[j].w)) {
+                    edit->setFocus(Qt::TabFocusReason);
+                    edit->selectAll();
+                    return true;
+                }
+            }
+            break;
+        }
+    }
+    return false;
+}
+
+bool EditorPanel::eventFilter(QObject* obj, QEvent* event) {
+    if (event->type() == QEvent::KeyPress) {
+        if (auto* edit = qobject_cast<QLineEdit*>(obj)) {
+            auto* keyEvent = static_cast<QKeyEvent*>(event);
+            if (keyEvent->key() == Qt::Key_Return || keyEvent->key() == Qt::Key_Enter) {
+                if (focusNextField(edit)) {
+                    keyEvent->accept();
+                    return true;
+                }
+            }
+        }
+    }
+    return QWidget::eventFilter(obj, event);
 }

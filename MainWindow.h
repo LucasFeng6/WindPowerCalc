@@ -18,6 +18,7 @@ struct Scheme {
     QString name;
     QMap<QString, QMap<QString,QVariant>> inputs; // projId -> (field -> value)
     QMap<QString, double> results;                // projId -> result
+    QMap<QString, QVariant> sharedInputs;         // sharedKey -> value
 };
 
 class MainWindow : public QMainWindow {
@@ -36,7 +37,7 @@ private slots:
     void onGenerate();
     void onSave();
     void onLoad();
-    void onExportCsv();
+    void onExportExcel();
 
 private:
     // UI
@@ -67,9 +68,11 @@ private:
     Scheme* currentScheme();
     const ProjectSpec* projectSpecFromIndex(const QModelIndex& idx) const;
     void refreshProjectSummaryRow(int row);
+    void updateGroupSummaries();
     void rebuildResultHeader();
     void rebuildResultBody(); // 使用 schemes_ 的 results
-    void setStatusInfo(const QString& msg);
+    void updateResultColumnWidths();
+    void setStatusInfo(const QString& msg, int timeoutMs = 3000);
 };
 
 #endif // MAINWINDOW_H
