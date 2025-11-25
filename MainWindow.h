@@ -72,7 +72,7 @@ private:
     void rebuildResultHeader();
     void rebuildResultBody(); // 使用 schemes_ 的 results
     void updateResultColumnWidths();
-    void setStatusInfo(const QString& msg);
+    void setStatusInfo(const QString& msg, int timeoutMs = 3000);
 };
 
 #endif // MAINWINDOW_H

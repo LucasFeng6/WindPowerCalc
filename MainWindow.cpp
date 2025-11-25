@@ -1,4 +1,4 @@
-﻿#include "MainWindow.h"
+#include "MainWindow.h"
 #include "SpecLoader.h"
 #include "EditorPanel.h"
 
@@ -655,8 +655,8 @@ void MainWindow::rebuildResultBody() {
     addTotalRow(u8"年费用", u8"万元/年", annualFeeTotals, QColor(255, 220, 200));
 }
 
-void MainWindow::setStatusInfo(const QString& msg) {
-    statusBar()->showMessage(msg, 3000);
+void MainWindow::setStatusInfo(const QString& msg, int timeoutMs) {
+    statusBar()->showMessage(msg, timeoutMs);
 }
 
 void MainWindow::onSave() {
@@ -774,13 +774,13 @@ void MainWindow::onLoad() {
 }
 
 void MainWindow::onExportExcel() {
-    if (schemes_.isEmpty()) {
+    if (schemes_.isEmpty()) {   //
         QMessageBox::information(this, u8"提示", u8"请先创建至少一个方案");
         return;
     }
 
     onGenerate();
-    if (resultModel_->columnCount() == 0) {
+    if (resultModel_->columnCount() == 0) { //
         QMessageBox::warning(this, u8"导出失败", u8"没有可以导出的数据");
         return;
     }
@@ -790,6 +790,9 @@ void MainWindow::onExportExcel() {
     if (!path.endsWith(".xlsx", Qt::CaseInsensitive)) {
         path += ".xlsx";
     }
+
+    setStatusInfo(u8"导出中...", 0);
+    QApplication::processEvents();
 
     QAxObject excel("Excel.Application");
     if (excel.isNull()) {
@@ -808,7 +811,9 @@ void MainWindow::onExportExcel() {
         if (workbook) {
             workbook->dynamicCall("Close(bool)", false);
         }
-        excel.dynamicCall("Quit()");
+        if (!excel.isNull()) {
+            excel.dynamicCall("Quit()");
+        }
         delete sheet;
         delete workbook;
         delete workbooks;
@@ -836,6 +841,7 @@ void MainWindow::onExportExcel() {
     if (!sheet) {
         QMessageBox::warning(this, u8"导出失败", u8"无法创建 Excel 工作表");
         cleanup();
+        setStatusInfo(u8"导出失败");
         return;
     }
 
@@ -875,6 +881,5 @@ void MainWindow::onExportExcel() {
     cleanup();
 
     setStatusInfo(u8"已导出Excel");
+    QMessageBox::information(this, u8"导出成功", u8"成功导出到"+path);
 }
-
-
