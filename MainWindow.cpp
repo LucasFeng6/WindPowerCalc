@@ -368,9 +368,8 @@ void MainWindow::onEditChanged() {
     // 当前项目重新计算
     {
         double result = 0.0;
-        QString explain;
         const auto allInputs = mergedInputs(spec->id);
-        if (calc_.evaluate(*spec, allInputs, result, &explain)) {
+        if (calc_.evaluate(*spec, allInputs, result)) {
             sch->results[spec->id] = result;
         } else {
             sch->results.remove(spec->id);
@@ -383,9 +382,8 @@ void MainWindow::onEditChanged() {
         const auto own = sch->inputs.value(s.id);
         if (own.isEmpty()) continue;
         double result = 0.0;
-        QString explain;
         const auto allInputs = mergedInputs(s.id);
-        if (calc_.evaluate(s, allInputs, result, &explain)) {
+        if (calc_.evaluate(s, allInputs, result)) {
             sch->results[s.id] = result;
         } else {
             sch->results.remove(s.id);
