@@ -152,17 +152,12 @@ static ProjectSpec parseItem(const QJsonObject& o) {
         InputField f;
         f.name = io.value("name").toString();
         f.label = io.value("label").toString();
-        f.type = io.value("type").toString();
         f.unit = io.value("unit").toString();
         f.sharedKey = io.value("sharedKey").toString();
         f.required = io.value("required").toBool(false);
         if (io.contains("defval")) f.defval = io.value("defval").toVariant();
         if (io.contains("min")) f.min = io.value("min").toDouble();
         if (io.contains("max")) f.max = io.value("max").toDouble();
-        if (io.contains("options")) {
-            for (const auto& ov : io.value("options").toArray())
-                f.enumOptions << ov.toString();
-        }
         s.inputs.push_back(f);
     }
     return s;

@@ -15,10 +15,8 @@
 #include <QJsonDocument>
 #include <QJsonObject>
 #include <QJsonArray>
-#include <QClipboard>
 #include <QApplication>
 #include <QFile>
-#include <QTextStream>
 #include <QBrush>
 #include <QColor>
 #include <QFont>
@@ -30,6 +28,23 @@
 #include <ActiveQt/QAxObject>
 #include <QDir>
 #include <cmath>
+
+namespace {
+const QStringList& initialInvestGroups() {
+    static const QStringList groups = {
+        u8"海上变电部分", u8"陆上变电部分",
+        u8"线路部分", u8"其他设备", u8"其他费用"
+    };
+    return groups;
+}
+
+const QStringList& annualCostGroups() {
+    static const QStringList groups = {
+        u8"损耗费用", u8"维护费", u8"停运损失费", u8"海域租赁费"
+    };
+    return groups;
+}
+}
 
 MainWindow::MainWindow(QWidget* parent): QMainWindow(parent) {
     spec_ = SpecLoader::loadDefault();
@@ -123,12 +138,8 @@ void MainWindow::buildProjectModel() {
     const QBrush groupRowBg(QColor(235, 235, 235));
     const QBrush projectRowBg(Qt::white);
 
-    // 定义层级结构
-    // 初期投资分类的组
-    QStringList initialInvestGroups = {u8"海上变电部分", u8"陆上变电部分", 
-                                        u8"线路部分", u8"其他设备", u8"其他费用"};
-    // 年运行费分类的组
-    QStringList annualCostGroups = {u8"损耗费用", u8"维护费", u8"停运损失费", u8"海域租赁费"};
+    const auto& initialGroups = initialInvestGroups();
+    const auto& annualGroups = annualCostGroups();
     
     // 二级分组（需要缩进显示的）
     QStringList subGroups = {u8"海上变电部分", u8"陆上变电部分"};
@@ -148,7 +159,7 @@ void MainWindow::buildProjectModel() {
     // 创建分组节点
     QMap<QString, QStandardItem*> groupNodes;
     for (const auto& g : spec_.groupsInOrder) {
-        if (initialInvestGroups.contains(g)) {
+        if (initialGroups.contains(g)) {
             auto* gItem0 = new QStandardItem(g);
             gItem0->setFlags(Qt::ItemIsEnabled | Qt::ItemIsSelectable);
             gItem0->setBackground(groupRowBg);
@@ -162,7 +173,7 @@ void MainWindow::buildProjectModel() {
     // 添加初期投资相关的项目
     for (int i = 0; i < spec_.items.size(); ++i) {
         const auto& s = spec_.items[i];
-        if (!initialInvestGroups.contains(s.group)) continue;
+        if (!initialGroups.contains(s.group)) continue;
         
         auto* p = groupNodes.value(s.group, nullptr);
         if (!p) continue;
@@ -193,7 +204,7 @@ void MainWindow::buildProjectModel() {
     
     // 创建年运行费分组节点
     for (const auto& g : spec_.groupsInOrder) {
-        if (annualCostGroups.contains(g)) {
+        if (annualGroups.contains(g)) {
             auto* gItem0 = new QStandardItem(g);
             gItem0->setFlags(Qt::ItemIsEnabled | Qt::ItemIsSelectable);
             gItem0->setBackground(groupRowBg);
@@ -207,7 +218,7 @@ void MainWindow::buildProjectModel() {
     // 添加年运行费相关的项目
     for (int i = 0; i < spec_.items.size(); ++i) {
         const auto& s = spec_.items[i];
-        if (!annualCostGroups.contains(s.group)) continue;
+        if (!annualGroups.contains(s.group)) continue;
         
         auto* p = groupNodes.value(s.group, nullptr);
         if (!p) continue;
@@ -221,8 +232,6 @@ void MainWindow::buildProjectModel() {
         summary->setBackground(projectRowBg);
         p->appendRow({nameIt, summary});
     }
-    
-    projectView_->expandAll();
 }
 
 int MainWindow::currentSchemeIndex() const {
@@ -461,10 +470,8 @@ void MainWindow::rebuildResultHeader() {
 void MainWindow::rebuildResultBody() {
     resultModel_->removeRows(0, resultModel_->rowCount());
     
-    // 定义分类
-    QStringList initialInvestGroups = {u8"海上变电部分", u8"陆上变电部分", 
-                                        u8"线路部分", u8"其他设备", u8"其他费用"};
-    QStringList annualCostGroups = {u8"损耗费用", u8"维护费", u8"停运损失费", u8"海域租赁费"};
+    const auto& initialGroups = initialInvestGroups();
+    const auto& annualGroups = annualCostGroups();
     
     QVector<double> initialInvestTotals(schemes_.size(), 0.0);  // 初期投资总计
     QVector<double> annualCostTotals(schemes_.size(), 0.0);     // 年费用总计
@@ -495,7 +502,7 @@ void MainWindow::rebuildResultBody() {
     addSectionTitle(u8"初期投资");
     
     for (const auto& g : spec_.groupsInOrder) {
-        if (!initialInvestGroups.contains(g)) continue;
+        if (!initialGroups.contains(g)) continue;
         
         // 添加分组标题行
         QList<QStandardItem*> groupRow;
@@ -550,7 +557,7 @@ void MainWindow::rebuildResultBody() {
     addSectionTitle(u8"年运行费");
     
     for (const auto& g : spec_.groupsInOrder) {
-        if (!annualCostGroups.contains(g)) continue;
+        if (!annualGroups.contains(g)) continue;
         
         // 添加分组标题行
         QList<QStandardItem*> groupRow;
@@ -603,8 +610,8 @@ void MainWindow::rebuildResultBody() {
     
     // ========== 总计行 ==========
     QVector<double> annualFeeTotals(schemes_.size(), 0.0);
-    const double recoveryRate = 0.05;
-    const double serviceYears = 30.0;
+    const double recoveryRate = 0.08;
+    const double serviceYears = 25.0;
     const double powTerm = std::pow(1.0 + recoveryRate, serviceYears);
     const double denominator = powTerm - 1.0;
     double annuityFactor = 0.0;
@@ -778,10 +785,6 @@ void MainWindow::onExportExcel() {
     }
 
     onGenerate();
-    if (resultModel_->columnCount() == 0) { //
-        QMessageBox::warning(this, u8"导出失败", u8"没有可以导出的数据");
-        return;
-    }
 
     QString path = QFileDialog::getSaveFileName(this, u8"导出Excel", "", "Excel (*.xlsx)");
     if (path.isEmpty()) return;

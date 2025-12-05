@@ -68,10 +68,8 @@ private:
     Scheme* currentScheme();
     const ProjectSpec* projectSpecFromIndex(const QModelIndex& idx) const;
     void refreshProjectSummaryRow(int row);
-    void updateGroupSummaries();
     void rebuildResultHeader();
     void rebuildResultBody(); // 使用 schemes_ 的 results
-    void updateResultColumnWidths();
     void setStatusInfo(const QString& msg, int timeoutMs = 3000);
 };
 

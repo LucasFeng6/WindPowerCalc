@@ -7,8 +7,6 @@
 
 class QFormLayout;
 class QLineEdit;
-class QComboBox;
-class QCheckBox;
 class QLabel;
 
 class EditorPanel : public QWidget {
@@ -34,9 +32,7 @@ private:
     struct FieldWidget {
         InputField f;
         QWidget* w = nullptr;
-        QLabel*  unitLabel = nullptr;
     };
-    QMap<QString,QVariant> sharedValues_;
     QVector<FieldWidget> fields_;
     QFormLayout* form_ = nullptr;
     QLabel* title_ = nullptr;

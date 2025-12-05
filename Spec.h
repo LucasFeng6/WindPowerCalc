@@ -10,14 +10,12 @@
 struct InputField {
     QString name;
     QString label;
-    QString type;     // "double" | "int" 
     QString unit;     // e.g. "km", "Ω/km"
     QString sharedKey; // optional: fields with same sharedKey share one value across projects
     QVariant defval;
     bool required = false;
     double min = std::numeric_limits<double>::lowest();
     double max = std::numeric_limits<double>::max();
-    QStringList enumOptions;      // for type=enum
 };
 
 struct ProjectSpec {

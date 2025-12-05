@@ -46,7 +46,6 @@ void EditorPanel::clearForm() {
         if (auto* w = item->widget()) w->deleteLater();
         delete item;
     }
-    sharedValues_.clear();
     fields_.clear();
 }
 
@@ -80,7 +79,6 @@ QWidget* EditorPanel::makeWidget(const InputField& f, const QVariant& def, bool 
 void EditorPanel::setProject(const ProjectSpec& spec, const QMap<QString,QVariant>& curInputs,
                              const QMap<QString,QVariant>& sharedInputs) {
     clearForm();
-    sharedValues_ = sharedInputs;
     if (!spec.label.isEmpty()) {
         title_->setText(QString(u8"<b>%1</b>（%2）").arg(spec.label, spec.unit));
     } else {
@@ -110,10 +108,9 @@ void EditorPanel::setProject(const ProjectSpec& spec, const QMap<QString,QVarian
         lbl->setMinimumHeight(32);
         form_->addRow(lbl, row);
 
-        FieldWidget fw; fw.f = f; fw.w = w; fw.unitLabel = unitLabel;
+        FieldWidget fw; fw.f = f; fw.w = w;
         fields_.push_back(fw);
 
-        connect(w, &QWidget::destroyed, this, []{});
         if (auto* edit = qobject_cast<QLineEdit*>(w))
             connect(edit, &QLineEdit::textChanged, this, &EditorPanel::inputsChanged);
     }
