@@ -38,6 +38,7 @@ private slots:
     void onSave();
     void onLoad();
     void onExportExcel();
+    void onEditEconomicParams();
 
 private:
     // UI
@@ -55,11 +56,15 @@ private:
     QAction* actDup_  = nullptr;
     QAction* actDel_  = nullptr;
     QAction* actExport_ = nullptr;
+    QAction* actEconomic_ = nullptr;
 
     // Data
     ProjectSpecSet spec_;
     Calculator calc_;
     QVector<Scheme> schemes_;  // 与 list 同步
+    double recoveryRate_ = 0.08;   // 投资回报率（默认值）
+    double serviceYears_ = 25.0;   // 使用年限（默认值，年）
+    bool hasSummary_ = false;      // 是否已生成汇总
 
     // helpers
     void initUi();

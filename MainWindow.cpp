@@ -27,6 +27,10 @@
 #include <QStatusBar>
 #include <ActiveQt/QAxObject>
 #include <QDir>
+#include <QDialog>
+#include <QFormLayout>
+#include <QDoubleSpinBox>
+#include <QDialogButtonBox>
 #include <cmath>
 
 namespace {
@@ -68,11 +72,14 @@ void MainWindow::initUi() {
     tb->addSeparator();
     actSave_ = tb->addAction(u8"保存方案集");
     actLoad_ = tb->addAction(u8"加载方案集");
+    tb->addSeparator();
+    actEconomic_ = tb->addAction(u8"经济参数");
 
     connect(actAdd_, &QAction::triggered, this, &MainWindow::addScheme);
     connect(actDup_, &QAction::triggered, this, &MainWindow::duplicateScheme);
     connect(actDel_, &QAction::triggered, this, &MainWindow::removeScheme);
     connect(actGen_, &QAction::triggered, this, &MainWindow::onGenerate);
+    connect(actEconomic_, &QAction::triggered, this, &MainWindow::onEditEconomicParams);
     connect(actSave_, &QAction::triggered, this, &MainWindow::onSave);
     connect(actLoad_, &QAction::triggered, this, &MainWindow::onLoad);
     connect(actExport_, &QAction::triggered, this, &MainWindow::onExportExcel);
@@ -448,6 +455,7 @@ void MainWindow::onGenerate() {
     
     rebuildResultHeader();
     rebuildResultBody();
+    hasSummary_ = true;
     
     setStatusInfo(QString(u8"已生成 %1 个方案的汇总").arg(schemes_.size()));
 }
@@ -609,15 +617,13 @@ void MainWindow::rebuildResultBody() {
     }
     
     // ========== 总计行 ==========
-    QVector<double> annualFeeTotals(schemes_.size(), 0.0);
-    const double recoveryRate = 0.08;
-    const double serviceYears = 25.0;
-    const double powTerm = std::pow(1.0 + recoveryRate, serviceYears);
-    const double denominator = powTerm - 1.0;
-    double annuityFactor = 0.0;
-    if (std::abs(denominator) > 1e-9) {
-        annuityFactor = (recoveryRate * powTerm) / denominator;
-    }
+      QVector<double> annualFeeTotals(schemes_.size(), 0.0);
+      const double powTerm = std::pow(1.0 + recoveryRate_, serviceYears_);
+      const double denominator = powTerm - 1.0;
+      double annuityFactor = 0.0;
+      if (std::abs(denominator) > 1e-9) {
+          annuityFactor = (recoveryRate_ * powTerm) / denominator;
+      }
     for (int i = 0; i < schemes_.size(); ++i) {
         annualFeeTotals[i] = initialInvestTotals[i] * annuityFactor + annualCostTotals[i];
     }
@@ -669,6 +675,8 @@ void MainWindow::onSave() {
     if (path.isEmpty()) return;
     
     QJsonObject root;
+    root["recoveryRate"] = recoveryRate_;
+    root["serviceYears"] = serviceYears_;
     QJsonArray schemesArr;
     
     for (const auto& sch : schemes_) {
@@ -734,6 +742,9 @@ void MainWindow::onLoad() {
     }
     
     QJsonObject root = doc.object();
+    hasSummary_ = false;
+    recoveryRate_ = root.value("recoveryRate").toDouble(0.08);
+    serviceYears_ = root.value("serviceYears").toDouble(25.0);
     QJsonArray schemesArr = root.value("schemes").toArray();
     
     // 清空现有方案
@@ -883,4 +894,38 @@ void MainWindow::onExportExcel() {
 
     setStatusInfo(u8"已导出Excel");
     QMessageBox::information(this, u8"导出成功", u8"成功导出到"+path);
+}
+
+void MainWindow::onEditEconomicParams() {
+    QDialog dlg(this);
+    dlg.setWindowTitle(u8"经济参数");
+
+    auto* form = new QFormLayout(&dlg);
+
+    auto* rateSpin = new QDoubleSpinBox(&dlg);
+    rateSpin->setRange(0.0, 100.0);
+    rateSpin->setDecimals(1);
+    rateSpin->setSingleStep(0.5);
+    rateSpin->setValue(recoveryRate_ * 100.0);
+    form->addRow(u8"投资回报率（%）", rateSpin);
+
+    auto* yearsSpin = new QDoubleSpinBox(&dlg);
+    yearsSpin->setRange(1, 100);
+    yearsSpin->setDecimals(0);
+    yearsSpin->setSingleStep(1);
+    yearsSpin->setValue(serviceYears_);
+    form->addRow(u8"使用年限（年）", yearsSpin);
+
+    auto* buttons = new QDialogButtonBox(QDialogButtonBox::Ok | QDialogButtonBox::Cancel, &dlg);
+    form->addWidget(buttons);
+    QObject::connect(buttons, &QDialogButtonBox::accepted, &dlg, &QDialog::accept);
+    QObject::connect(buttons, &QDialogButtonBox::rejected, &dlg, &QDialog::reject);
+
+    if (dlg.exec() == QDialog::Accepted) {
+        recoveryRate_ = rateSpin->value() / 100.0;
+        serviceYears_ = yearsSpin->value();
+        if (hasSummary_) {
+            rebuildResultBody();
+        }
+    }
 }
