@@ -11,6 +11,7 @@ class QListWidget;
 class QTreeView;
 class QTableView;
 class QStandardItemModel;
+class QStandardItem;
 class EditorPanel;
 class QAction;
 
@@ -72,10 +73,15 @@ private:
     int currentSchemeIndex() const;
     Scheme* currentScheme();
     const ProjectSpec* projectSpecFromIndex(const QModelIndex& idx) const;
-    void refreshProjectSummaryRow(int row);
+    void refreshProjectSummaries();
     void rebuildResultHeader();
     void rebuildResultBody(); // 使用 schemes_ 的 results
     void setStatusInfo(const QString& msg, int timeoutMs = 3000);
+
+    QMap<int, QStandardItem*> itemSummaryItems_;
+    QMap<QString, QStandardItem*> groupSummaryItems_;
+    QStandardItem* initialSummaryItem_ = nullptr;
+    QStandardItem* annualSummaryItem_ = nullptr;
 };
 
 #endif // MAINWINDOW_H

@@ -144,6 +144,10 @@ void MainWindow::buildProjectModel() {
     projectModel_->setHorizontalHeaderLabels({u8"项目", u8"小计 / 状态"});
     const QBrush groupRowBg(QColor(235, 235, 235));
     const QBrush projectRowBg(Qt::white);
+    itemSummaryItems_.clear();
+    groupSummaryItems_.clear();
+    initialSummaryItem_ = nullptr;
+    annualSummaryItem_ = nullptr;
 
     const auto& initialGroups = initialInvestGroups();
     const auto& annualGroups = annualCostGroups();
@@ -161,6 +165,7 @@ void MainWindow::buildProjectModel() {
     initInvestTitle->setFlags(Qt::ItemIsEnabled);
     auto* initInvestSummary = new QStandardItem();
     initInvestSummary->setFlags(Qt::ItemIsEnabled);
+    initialSummaryItem_ = initInvestSummary;
     projectModel_->appendRow({initInvestTitle, initInvestSummary});
     
     // 创建分组节点
@@ -174,6 +179,7 @@ void MainWindow::buildProjectModel() {
             gItem1->setBackground(groupRowBg);
             projectModel_->appendRow({gItem0, gItem1});
             groupNodes[g] = gItem0;
+            groupSummaryItems_[g] = gItem1;
         }
     }
     
@@ -198,6 +204,7 @@ void MainWindow::buildProjectModel() {
         auto* summary = new QStandardItem(u8"未填写");
         summary->setBackground(projectRowBg);
         p->appendRow({nameIt, summary});
+        itemSummaryItems_[i] = summary;
     }
     
     // 添加"年运行费"标题行
@@ -207,6 +214,7 @@ void MainWindow::buildProjectModel() {
     annualCostTitle->setFlags(Qt::ItemIsEnabled);
     auto* annualCostSummary = new QStandardItem();
     annualCostSummary->setFlags(Qt::ItemIsEnabled);
+    annualSummaryItem_ = annualCostSummary;
     projectModel_->appendRow({annualCostTitle, annualCostSummary});
     
     // 创建年运行费分组节点
@@ -219,6 +227,7 @@ void MainWindow::buildProjectModel() {
             gItem1->setBackground(groupRowBg);
             projectModel_->appendRow({gItem0, gItem1});
             groupNodes[g] = gItem0;
+            groupSummaryItems_[g] = gItem1;
         }
     }
     
@@ -238,6 +247,7 @@ void MainWindow::buildProjectModel() {
         auto* summary = new QStandardItem(u8"未填写");
         summary->setBackground(projectRowBg);
         p->appendRow({nameIt, summary});
+        itemSummaryItems_[i] = summary;
     }
 }
 
@@ -301,9 +311,7 @@ void MainWindow::removeScheme() {
 void MainWindow::onSchemeListChanged(int idx) {
     if (idx < 0 || idx >= schemes_.size()) return;
     // 刷新项目树的摘要列
-    for (int i = 0; i < spec_.items.size(); ++i) {
-        refreshProjectSummaryRow(i);
-    }
+    refreshProjectSummaries();
     // 刷新编辑器
     onProjectSelectionChanged();
 }
@@ -338,17 +346,7 @@ void MainWindow::onProjectSelectionChanged() {
     const auto& inputs = sch->inputs.value(spec->id);
     editor_->setProject(*spec, inputs, sch->sharedInputs);
     editor_->focusFirstField();
-    
-    // 更新此行的摘要
-    if (idx.isValid()) {
-        QStandardItem* item = projectModel_->itemFromIndex(idx);
-        if (item) {
-            int rowId = item->data().toInt();
-            if (rowId >= 0 && rowId < spec_.items.size()) {
-                refreshProjectSummaryRow(rowId);
-            }
-        }
-    }
+    refreshProjectSummaries();
 }
 void MainWindow::onEditChanged() {
     const QModelIndex idx = projectView_->currentIndex();
@@ -407,45 +405,103 @@ void MainWindow::onEditChanged() {
     }
     
     // 刷新摘要
-    for (int i = 0; i < spec_.items.size(); ++i) {
-        refreshProjectSummaryRow(i);
-    }
+    refreshProjectSummaries();
 }
 
-void MainWindow::refreshProjectSummaryRow(int row) {
-    if (row < 0 || row >= spec_.items.size()) return;
-    
-    const auto& spec = spec_.items[row];
+void MainWindow::refreshProjectSummaries() {
     Scheme* sch = currentScheme();
-    if (!sch) return;
-    
-    // 找到对应的树节点
-    // 遍历所有分组节点
-    for (int g = 0; g < projectModel_->rowCount(); ++g) {
-        QStandardItem* groupItem = projectModel_->item(g, 0);
-        if (!groupItem) continue;
-        
-        for (int r = 0; r < groupItem->rowCount(); ++r) {
-            QStandardItem* nameItem = groupItem->child(r, 0);
-            if (!nameItem) continue;
-            
-            int itemRow = nameItem->data().toInt();
-            if (itemRow == row) {
-                QStandardItem* summaryItem = groupItem->child(r, 1);
-                if (!summaryItem) continue;
-                
-                if (spec.groupHeader) {
-                    summaryItem->setText(u8"（分组标题）");
-                } else if (sch->results.contains(spec.id)) {
-                    double val = sch->results[spec.id];
-                    summaryItem->setText(QString::number(val, 'f', 2) + " " + spec.unit);
-                } else if (sch->inputs.contains(spec.id)) {
-                    summaryItem->setText(u8"已填写（计算失败）");
-                } else {
-                    summaryItem->setText(u8"未填写");
-                }
-                return;
+    const auto& initialGroups = initialInvestGroups();
+    const auto& annualGroups = annualCostGroups();
+    const QBrush sectionSumFg(QColor(30, 70, 160));
+    const QBrush groupSumFg(QColor(150, 90, 0));
+    if (!sch) {
+        for (auto it = itemSummaryItems_.begin(); it != itemSummaryItems_.end(); ++it) {
+            if (it.value()) it.value()->setText(u8"未填写");
+        }
+        for (auto it = groupSummaryItems_.begin(); it != groupSummaryItems_.end(); ++it) {
+            if (it.value()) it.value()->setText(u8"—");
+        }
+        if (initialSummaryItem_) {
+            initialSummaryItem_->setText(u8"—");
+            initialSummaryItem_->setData(QVariant(), Qt::ForegroundRole);
+        }
+        if (annualSummaryItem_) {
+            annualSummaryItem_->setText(u8"—");
+            annualSummaryItem_->setData(QVariant(), Qt::ForegroundRole);
+        }
+        return;
+    }
+
+    QMap<QString, double> groupTotals;
+    QMap<QString, bool> groupHasValues;
+    double initialTotal = 0.0;
+    double annualTotal = 0.0;
+    bool hasInitial = false;
+    bool hasAnnual = false;
+
+    for (int i = 0; i < spec_.items.size(); ++i) {
+        const auto& spec = spec_.items[i];
+        QStandardItem* summaryItem = itemSummaryItems_.value(i, nullptr);
+        if (!summaryItem) continue;
+        if (spec.groupHeader) {
+            summaryItem->setText(u8"（分组标题）");
+            continue;
+        }
+
+        summaryItem->setData(QVariant(), Qt::ForegroundRole);
+        QString text;
+        if (sch->results.contains(spec.id)) {
+            double val = sch->results.value(spec.id);
+            text = QString::number(val, 'f', 2) + " " + spec.unit;
+            groupTotals[spec.group] += val;
+            groupHasValues[spec.group] = true;
+            if (initialGroups.contains(spec.group)) {
+                initialTotal += val;
+                hasInitial = true;
+            } else if (annualGroups.contains(spec.group)) {
+                annualTotal += val;
+                hasAnnual = true;
             }
+        } else if (sch->inputs.contains(spec.id)) {
+            text = u8"已填写（计算失败）";
+        } else {
+            text = u8"未填写";
+        }
+        summaryItem->setText(text);
+    }
+
+    for (auto it = groupSummaryItems_.begin(); it != groupSummaryItems_.end(); ++it) {
+        const QString groupName = it.key();
+        QStandardItem* summaryItem = it.value();
+        if (!summaryItem) continue;
+        const double total = groupTotals.value(groupName, 0.0);
+        const bool hasValue = groupHasValues.value(groupName, false);
+        if (hasValue) {
+            const QString unit = initialGroups.contains(groupName) ? u8" 万元" : u8" 万元/年";
+            summaryItem->setText(QString::number(total, 'f', 0) + unit);
+            summaryItem->setForeground(groupSumFg);
+        } else {
+            summaryItem->setText(u8"—");
+            summaryItem->setData(QVariant(), Qt::ForegroundRole);
+        }
+    }
+
+    if (initialSummaryItem_) {
+        if (hasInitial) {
+            initialSummaryItem_->setText(QString::number(initialTotal, 'f', 0) + u8" 万元");
+            initialSummaryItem_->setForeground(sectionSumFg);
+        } else {
+            initialSummaryItem_->setText(u8"—");
+            initialSummaryItem_->setData(QVariant(), Qt::ForegroundRole);
+        }
+    }
+    if (annualSummaryItem_) {
+        if (hasAnnual) {
+            annualSummaryItem_->setText(QString::number(annualTotal, 'f', 0) + u8" 万元/年");
+            annualSummaryItem_->setForeground(sectionSumFg);
+        } else {
+            annualSummaryItem_->setText(u8"—");
+            annualSummaryItem_->setData(QVariant(), Qt::ForegroundRole);
         }
     }
 }
@@ -475,20 +531,24 @@ void MainWindow::rebuildResultHeader() {
     }
 }
 
+
 void MainWindow::rebuildResultBody() {
     resultModel_->removeRows(0, resultModel_->rowCount());
     
     const auto& initialGroups = initialInvestGroups();
     const auto& annualGroups = annualCostGroups();
+    const QBrush sectionTitleBg(QColor(180, 200, 255));
+    const QBrush groupRowBg(QColor(220, 220, 220));
+    const QBrush sectionSumFg(QColor(30, 70, 160));
+    const QBrush groupSumFg(QColor(150, 90, 0));
     
-    QVector<double> initialInvestTotals(schemes_.size(), 0.0);  // 初期投资总计
-    QVector<double> annualCostTotals(schemes_.size(), 0.0);     // 年费用总计
+    QVector<double> initialInvestTotals(schemes_.size(), 0.0);
+    QVector<double> annualCostTotals(schemes_.size(), 0.0);
     
-    // ========== 初期投资部分 ==========
-    auto addSectionTitle = [this](const QString& title) {
+    auto addSectionTitle = [this, sectionTitleBg](const QString& title) {
         QList<QStandardItem*> titleRow;
         auto* titleItem = new QStandardItem(title);
-        titleItem->setBackground(QBrush(QColor(180, 200, 255)));
+        titleItem->setBackground(sectionTitleBg);
         QFont titleFont = titleItem->font();
         titleFont.setBold(true);
         titleFont.setPointSize(titleFont.pointSize() + 1);
@@ -496,44 +556,86 @@ void MainWindow::rebuildResultBody() {
         titleRow << titleItem;
         
         auto* unitItem = new QStandardItem("");
-        unitItem->setBackground(QBrush(QColor(180, 200, 255)));
+        unitItem->setBackground(sectionTitleBg);
         titleRow << unitItem;
         
+        QVector<QStandardItem*> dataCells;
         for (int i = 0; i < schemes_.size(); ++i) {
             auto* item = new QStandardItem("");
-            item->setBackground(QBrush(QColor(180, 200, 255)));
+            item->setBackground(sectionTitleBg);
+            item->setTextAlignment(Qt::AlignRight | Qt::AlignVCenter);
             titleRow << item;
+            dataCells << item;
         }
         resultModel_->appendRow(titleRow);
+        return dataCells;
     };
     
-    addSectionTitle(u8"初期投资");
+    auto addGroupRow = [this, groupRowBg, groupSumFg](const QString& groupName, const QString& unit,
+                                                      const QVector<double>& totals,
+                                                      const QVector<bool>& hasValues) {
+        QList<QStandardItem*> groupRow;
+        auto* gName = new QStandardItem(QString(u8"【%1】").arg(groupName));
+        gName->setBackground(groupRowBg);
+        QFont f = gName->font();
+        f.setBold(true);
+        gName->setFont(f);
+        groupRow << gName;
+        
+        auto* gUnit = new QStandardItem(unit);
+        gUnit->setBackground(groupRowBg);
+        groupRow << gUnit;
+        
+        for (int i = 0; i < schemes_.size(); ++i) {
+            const bool hasValue = (i < hasValues.size()) ? hasValues[i] : false;
+            QString txt = hasValue ? QString::number(totals[i], 'f', 0) : "-";
+            auto* item = new QStandardItem(txt);
+            item->setBackground(groupRowBg);
+            item->setTextAlignment(Qt::AlignRight | Qt::AlignVCenter);
+            if (hasValue) {
+                item->setForeground(groupSumFg);
+            } else {
+                item->setData(QVariant(), Qt::ForegroundRole);
+            }
+            groupRow << item;
+        }
+        resultModel_->appendRow(groupRow);
+    };
+    
+    auto updateSectionTotals = [&](const QVector<double>& totals,
+                                   const QVector<QStandardItem*>& cells) {
+        for (int i = 0; i < cells.size() && i < totals.size(); ++i) {
+            auto* item = cells[i];
+            if (!item) continue;
+            item->setText(QString::number(totals[i], 'f', 0));
+            item->setForeground(sectionSumFg);
+        }
+    };
+    
+    const auto initialTitleCells = addSectionTitle(u8"初期投资");
     
     for (const auto& g : spec_.groupsInOrder) {
         if (!initialGroups.contains(g)) continue;
         
-        // 添加分组标题行
-        QList<QStandardItem*> groupRow;
-        auto* gName = new QStandardItem(QString(u8"【%1】").arg(g));
-        gName->setBackground(QBrush(QColor(220, 220, 220)));
-        QFont f = gName->font();
-        f.setBold(true);
-        gName->setFont(f);
-        groupRow << gName;
-        
-        auto* gUnit = new QStandardItem("");
-        gUnit->setBackground(QBrush(QColor(220, 220, 220)));
-        groupRow << gUnit;
-        
-        for (int i = 0; i < schemes_.size(); ++i) {
-            auto* item = new QStandardItem("");
-            item->setBackground(QBrush(QColor(220, 220, 220)));
-            groupRow << item;
-        }
-        resultModel_->appendRow(groupRow);
-        
-        // 添加该分组的所有项目
         const auto& rows = spec_.groupRows.value(g);
+        QVector<double> groupTotals(schemes_.size(), 0.0);
+        QVector<bool> groupHasValues(schemes_.size(), false);
+        for (int idx : rows) {
+            if (idx < 0 || idx >= spec_.items.size()) continue;
+            const auto& spec = spec_.items[idx];
+            for (int i = 0; i < schemes_.size(); ++i) {
+                const auto& sch = schemes_[i];
+                if (sch.results.contains(spec.id)) {
+                    groupTotals[i] += sch.results.value(spec.id);
+                    groupHasValues[i] = true;
+                }
+            }
+        }
+        addGroupRow(g, u8"万元", groupTotals, groupHasValues);
+        for (int i = 0; i < schemes_.size(); ++i) {
+            if (groupHasValues[i]) initialInvestTotals[i] += groupTotals[i];
+        }
+        
         for (int idx : rows) {
             if (idx < 0 || idx >= spec_.items.size()) continue;
             const auto& spec = spec_.items[idx];
@@ -545,11 +647,9 @@ void MainWindow::rebuildResultBody() {
             for (int i = 0; i < schemes_.size(); ++i) {
                 const auto& sch = schemes_[i];
                 QString txt;
-                double val = 0.0;
                 if (sch.results.contains(spec.id)) {
-                    val = sch.results[spec.id];
+                    const double val = sch.results.value(spec.id);
                     txt = QString::number(val, 'f', 2);
-                    initialInvestTotals[i] += val;
                 } else {
                     txt = "-";
                 }
@@ -561,34 +661,32 @@ void MainWindow::rebuildResultBody() {
         }
     }
     
-    // ========== 年运行费部分 ==========
-    addSectionTitle(u8"年运行费");
+    updateSectionTotals(initialInvestTotals, initialTitleCells);
+    
+    const auto annualTitleCells = addSectionTitle(u8"年运行费");
     
     for (const auto& g : spec_.groupsInOrder) {
         if (!annualGroups.contains(g)) continue;
         
-        // 添加分组标题行
-        QList<QStandardItem*> groupRow;
-        auto* gName = new QStandardItem(QString(u8"【%1】").arg(g));
-        gName->setBackground(QBrush(QColor(220, 220, 220)));
-        QFont f = gName->font();
-        f.setBold(true);
-        gName->setFont(f);
-        groupRow << gName;
-        
-        auto* gUnit = new QStandardItem("");
-        gUnit->setBackground(QBrush(QColor(220, 220, 220)));
-        groupRow << gUnit;
-        
-        for (int i = 0; i < schemes_.size(); ++i) {
-            auto* item = new QStandardItem("");
-            item->setBackground(QBrush(QColor(220, 220, 220)));
-            groupRow << item;
-        }
-        resultModel_->appendRow(groupRow);
-        
-        // 添加该分组的所有项目
         const auto& rows = spec_.groupRows.value(g);
+        QVector<double> groupTotals(schemes_.size(), 0.0);
+        QVector<bool> groupHasValues(schemes_.size(), false);
+        for (int idx : rows) {
+            if (idx < 0 || idx >= spec_.items.size()) continue;
+            const auto& spec = spec_.items[idx];
+            for (int i = 0; i < schemes_.size(); ++i) {
+                const auto& sch = schemes_[i];
+                if (sch.results.contains(spec.id)) {
+                    groupTotals[i] += sch.results.value(spec.id);
+                    groupHasValues[i] = true;
+                }
+            }
+        }
+        addGroupRow(g, u8"万元/年", groupTotals, groupHasValues);
+        for (int i = 0; i < schemes_.size(); ++i) {
+            if (groupHasValues[i]) annualCostTotals[i] += groupTotals[i];
+        }
+        
         for (int idx : rows) {
             if (idx < 0 || idx >= spec_.items.size()) continue;
             const auto& spec = spec_.items[idx];
@@ -600,11 +698,9 @@ void MainWindow::rebuildResultBody() {
             for (int i = 0; i < schemes_.size(); ++i) {
                 const auto& sch = schemes_[i];
                 QString txt;
-                double val = 0.0;
                 if (sch.results.contains(spec.id)) {
-                    val = sch.results[spec.id];
+                    const double val = sch.results.value(spec.id);
                     txt = QString::number(val, 'f', 2);
-                    annualCostTotals[i] += val;
                 } else {
                     txt = "-";
                 }
@@ -616,19 +712,20 @@ void MainWindow::rebuildResultBody() {
         }
     }
     
-    // ========== 总计行 ==========
-      QVector<double> annualFeeTotals(schemes_.size(), 0.0);
-      const double powTerm = std::pow(1.0 + recoveryRate_, serviceYears_);
-      const double denominator = powTerm - 1.0;
-      double annuityFactor = 0.0;
-      if (std::abs(denominator) > 1e-9) {
-          annuityFactor = (recoveryRate_ * powTerm) / denominator;
-      }
+    updateSectionTotals(annualCostTotals, annualTitleCells);
+    
+    QVector<double> annualFeeTotals(schemes_.size(), 0.0);
+    const double powTerm = std::pow(1.0 + recoveryRate_, serviceYears_);
+    const double denominator = powTerm - 1.0;
+    double annuityFactor = 0.0;
+    if (std::abs(denominator) > 1e-9) {
+        annuityFactor = (recoveryRate_ * powTerm) / denominator;
+    }
     for (int i = 0; i < schemes_.size(); ++i) {
         annualFeeTotals[i] = initialInvestTotals[i] * annuityFactor + annualCostTotals[i];
     }
     
-    auto addTotalRow = [this](const QString& label, const QString& unit, 
+    auto addTotalRow = [this](const QString& label, const QString& unit,
                               const QVector<double>& totals, const QColor& bgColor) {
         QList<QStandardItem*> totalRow;
         auto* nameItem = new QStandardItem(label);
@@ -652,19 +749,16 @@ void MainWindow::rebuildResultBody() {
         resultModel_->appendRow(totalRow);
     };
     
-    // 空行
     QList<QStandardItem*> emptyRow;
     for (int i = 0; i < 2 + schemes_.size(); ++i) {
         emptyRow << new QStandardItem("");
     }
     resultModel_->appendRow(emptyRow);
     
-    // 初期投资总计
     addTotalRow(u8"初期投资", u8"万元", initialInvestTotals, QColor(255, 255, 200));
-    
-    // 年费用总计
     addTotalRow(u8"年费用", u8"万元/年", annualFeeTotals, QColor(255, 220, 200));
 }
+
 
 void MainWindow::setStatusInfo(const QString& msg, int timeoutMs) {
     statusBar()->showMessage(msg, timeoutMs);
