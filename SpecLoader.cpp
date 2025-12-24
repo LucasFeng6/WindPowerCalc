@@ -51,9 +51,9 @@ static const char* kEmbeddedSpec = R"JSON(
       "formula":"result = capex;" },
 
     { "id":"other_cost", "group":"其他费用", "label":"其他费用", "unit":"万元", "inputs":[
-        {"name":"capex","label":"其他费用","type":"double","unit":"万元","required":false,"defval":0}
+        {"name":"rate","label":"折算倍率","type":"double","unit":"倍","required":false,"defval":0.08}
       ],
-      "formula":"result = capex;" },
+      "formula":"result = core_capex_total * rate;" },
 
     { "id":"loss_dc_cable", "group":"损耗费用", "label":"直流海缆损耗", "unit":"万元/年", "inputs":[
         {"name":"resistance","label":"电阻","type":"double","unit":"Ω/km","required":false,"defval":0},
@@ -91,10 +91,10 @@ static const char* kEmbeddedSpec = R"JSON(
       "formula":"result = charge_power*0.6*0.001*loss_hours * price / 10.0;" },
 
     { "id":"om_substation_equipment", "group":"维护费", "label":"变电设备维护费", "unit":"万元/年", "inputs":[
-        {"name":"offshore_om","label":"海上变电设备维护费","type":"double","unit":"万元/年","required":false,"defval":0},
-        {"name":"onshore_om","label":"陆上变电设备维护费","type":"double","unit":"万元/年","required":false,"defval":0}
+        {"name":"offshore_rate","label":"海上设备折算倍率","type":"double","unit":"倍","required":false,"defval":0.02},
+        {"name":"onshore_rate","label":"陆上设备折算倍率","type":"double","unit":"倍","required":false,"defval":0.02}
       ],
-      "formula":"result = offshore_om + onshore_om;" },
+      "formula":"result = (offshore_capex_total * offshore_rate) + (onshore_capex_total * onshore_rate);" },
 
     { "id":"downtime_cable", "group":"停运损失费", "label":"海缆故障停运", "unit":"万元/年", "inputs":[
         {"name":"util_hours","label":"故障维修时长","type":"double","unit":"h","required":false,"defval":0},

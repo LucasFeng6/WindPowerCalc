@@ -70,6 +70,11 @@ QWidget* EditorPanel::makeWidget(const InputField& f, const QVariant& def, bool 
 
     if (hasValue && def.isValid()) {
         edit->setText(def.toString());
+    } else if (!hasValue && f.defval.isValid()
+               && f.defval.canConvert<double>()
+               && std::abs(f.defval.toDouble()) > 1e-12) {
+        // 无保存值，且默认值非0，显示默认值
+        edit->setText(f.defval.toString());
     }
 
     edit->installEventFilter(const_cast<EditorPanel*>(this));
@@ -136,7 +141,12 @@ bool EditorPanel::collectInputs(QMap<QString,QVariant>& ownOut, QMap<QString,QVa
             return false;
         }
         const QString text = widgetValue(fw).toString().trimmed();
-        const QVariant v = text;
+        QVariant v;
+        if (text.isEmpty() && fw.f.defval.isValid()) {
+            v = fw.f.defval;
+        } else {
+            v = text;
+        }
         if (!fw.f.sharedKey.isEmpty()) {
             sharedOut.insert(fw.f.sharedKey, v);
         } else {

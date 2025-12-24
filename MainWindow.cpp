@@ -48,6 +48,35 @@ const QStringList& annualCostGroups() {
     };
     return groups;
 }
+
+// 计算当前方案中若干投资分组（海上变电、陆上变电、线路、其他设备）的总投资，写入共享输入
+static void updateCapexTotals(const ProjectSpecSet& specSet, Scheme* sch) {
+    if (!sch) return;
+    double offshore = 0.0;
+    double onshore = 0.0;
+    double line = 0.0;
+    double otherEquip = 0.0;
+
+    for (const auto& spec : specSet.items) {
+        if (!sch->results.contains(spec.id)) continue;
+        const double val = sch->results.value(spec.id);
+        if (spec.group == u8"海上变电部分") {
+            offshore += val;
+        } else if (spec.group == u8"陆上变电部分") {
+            onshore += val;
+        } else if (spec.group == u8"线路部分") {
+            line += val;
+        } else if (spec.group == u8"其他设备") {
+            otherEquip += val;
+        }
+    }
+
+    sch->sharedInputs["offshore_capex_total"] = offshore;
+    sch->sharedInputs["onshore_capex_total"] = onshore;
+    sch->sharedInputs["line_capex_total"] = line;
+    sch->sharedInputs["other_equipment_capex_total"] = otherEquip;
+    sch->sharedInputs["core_capex_total"] = offshore + onshore + line + otherEquip;
+}
 }
 
 MainWindow::MainWindow(QWidget* parent): QMainWindow(parent) {
@@ -390,7 +419,7 @@ void MainWindow::onEditChanged() {
         }
     }
 
-    // Recompute others after shared inputs change
+    // 共享输入改变后，重新计算其他已填写项目
     for (const auto& s : spec_.items) {
         if (s.id == spec->id) continue;
         const auto own = sch->inputs.value(s.id);
@@ -401,6 +430,64 @@ void MainWindow::onEditChanged() {
             sch->results[s.id] = result;
         } else {
             sch->results.remove(s.id);
+        }
+    }
+
+    // 更新变电设备维护费所需的共享输入（分组总投资）
+    updateCapexTotals(spec_, sch);
+
+    // 在新的总投资基础上重新计算“变电设备维护费”（若未编辑则使用默认倍率）
+    for (const auto& s : spec_.items) {
+        if (s.id == "om_substation_equipment") {
+            auto own = sch->inputs.value(s.id);
+            if (own.isEmpty()) {
+                // 若用户从未编辑过该项目，则使用规格里的默认值初始化输入
+                QMap<QString,QVariant> defaults;
+                for (const auto& f : s.inputs) {
+                    if (f.defval.isValid()) {
+                        defaults.insert(f.name, f.defval);
+                    }
+                }
+                if (defaults.isEmpty()) {
+                    break;
+                }
+                sch->inputs[s.id] = defaults;
+            }
+            double result = 0.0;
+            const auto allInputs = mergedInputs(s.id);
+            if (calc_.evaluate(s, allInputs, result)) {
+                sch->results[s.id] = result;
+            } else {
+                sch->results.remove(s.id);
+            }
+            break;
+        }
+    }
+
+    // 在新的总投资基础上重新计算“其他费用”（若未编辑则使用默认倍率）
+    for (const auto& s : spec_.items) {
+        if (s.id == "other_cost") {
+            auto own = sch->inputs.value(s.id);
+            if (own.isEmpty()) {
+                QMap<QString,QVariant> defaults;
+                for (const auto& f : s.inputs) {
+                    if (f.defval.isValid()) {
+                        defaults.insert(f.name, f.defval);
+                    }
+                }
+                if (defaults.isEmpty()) {
+                    break;
+                }
+                sch->inputs[s.id] = defaults;
+            }
+            double result = 0.0;
+            const auto allInputs = mergedInputs(s.id);
+            if (calc_.evaluate(s, allInputs, result)) {
+                sch->results[s.id] = result;
+            } else {
+                sch->results.remove(s.id);
+            }
+            break;
         }
     }
     
@@ -452,7 +539,7 @@ void MainWindow::refreshProjectSummaries() {
         QString text;
         if (sch->results.contains(spec.id)) {
             double val = sch->results.value(spec.id);
-            text = QString::number(val, 'f', 2) + " " + spec.unit;
+            text = QString::number(val, 'f', 2);
             groupTotals[spec.group] += val;
             groupHasValues[spec.group] = true;
             if (initialGroups.contains(spec.group)) {
@@ -642,7 +729,7 @@ void MainWindow::rebuildResultBody() {
             
             QList<QStandardItem*> row;
             row << new QStandardItem("  " + spec.label);
-            row << new QStandardItem(spec.unit);
+            row << new QStandardItem("");
             
             for (int i = 0; i < schemes_.size(); ++i) {
                 const auto& sch = schemes_[i];
@@ -693,7 +780,7 @@ void MainWindow::rebuildResultBody() {
             
             QList<QStandardItem*> row;
             row << new QStandardItem("  " + spec.label);
-            row << new QStandardItem(spec.unit);
+            row << new QStandardItem("");
             
             for (int i = 0; i < schemes_.size(); ++i) {
                 const auto& sch = schemes_[i];
