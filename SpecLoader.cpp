@@ -96,14 +96,23 @@ static const char* kEmbeddedSpec = R"JSON(
       ],
       "formula":"result = (offshore_capex_total * offshore_rate) + (onshore_capex_total * onshore_rate);" },
 
-    { "id":"downtime_cable", "group":"停运损失费", "label":"海缆故障停运", "unit":"万元/年", "inputs":[
-        {"name":"util_hours","label":"故障维修时长","type":"double","unit":"h","required":false,"defval":0},
+    { "id":"downtime_cable", "group":"停运损失费", "label":"直流海缆故障停运", "unit":"万元/年", "inputs":[
+        {"name":"use_hours","label":"年利用小时数","type":"double","unit":"h","required":false,"defval":0},
         {"name":"length","label":"海缆长度","type":"double","unit":"km","required":false,"defval":0},
         {"name":"terminals","label":"终端数量","type":"int","unit":"个","required":false,"defval":0},
         {"name":"avg_power","label":"年平均功率","type":"double","unit":"MW","required":false,"defval":0},
         {"name":"price","label":"电价","type":"double","unit":"元/kWh","required":false,"defval":0,"sharedKey":"price"}
       ],
-      "formula":"result = (0.03*length/100 + 0.007*terminals/100 + 0.0705*length/100)*avg_power*util_hours*price/10.0;" },
+      "formula":"result = (0.03*length/100 + 0.007*terminals/100 + 0.0189)*avg_power*use_hours*0.1808*price/10.0;" },
+
+      { "id":"downtime_cable2", "group":"停运损失费", "label":"交流海缆故障停运", "unit":"万元/年", "inputs":[
+        {"name":"use_hours2","label":"年利用小时数","type":"double","unit":"h","required":false,"defval":0},
+        {"name":"length2","label":"海缆长度","type":"double","unit":"km","required":false,"defval":0},
+        {"name":"terminals2","label":"终端数量","type":"int","unit":"个","required":false,"defval":0},
+        {"name":"avg_power2","label":"年平均功率","type":"double","unit":"MW","required":false,"defval":0},
+        {"name":"price","label":"电价","type":"double","unit":"元/kWh","required":false,"defval":0,"sharedKey":"price"}
+      ],
+      "formula":"result = (0.03*length2/100 + 0.007*terminals2/100 + 0.0189)*avg_power2*use_hours2*0.1808*price/10.0;" },
 
     { "id":"downtime_equipment", "group":"停运损失费", "label":"设备故障停运", "unit":"万元/年", "inputs":[
         {"name":"avg_power","label":"年平均功率","type":"double","unit":"MW","required":false,"defval":0},
