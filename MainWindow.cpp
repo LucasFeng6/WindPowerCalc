@@ -88,7 +88,7 @@ MainWindow::MainWindow(QWidget* parent): QMainWindow(parent) {
 }
 
 void MainWindow::initUi() {
-    setWindowTitle(u8"海上风电全生命周期费用计算");
+    setWindowTitle(u8"海上风电送出经济比较");
 
     // 工具栏
     auto* tb = addToolBar(u8"工具");

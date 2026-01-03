@@ -10,6 +10,7 @@
 #include <QVariant>
 #include <QtGlobal>
 #include <QKeyEvent>
+#include <QSpacerItem>
 #include <limits>
 #include <algorithm>
 #include <cmath>
@@ -92,6 +93,10 @@ void EditorPanel::setProject(const ProjectSpec& spec, const QMap<QString,QVarian
     note_->setText(spec.note);
 
     for (const auto& f : spec.inputs) {
+        const bool isOverrideField = (f.name == "override_result");
+        if (isOverrideField) {
+            form_->addItem(new QSpacerItem(0, 18, QSizePolicy::Minimum, QSizePolicy::Fixed));
+        }
         auto* row = new QWidget(this);
         auto* hl = new QHBoxLayout(row);
         hl->setContentsMargins(0,0,0,0);

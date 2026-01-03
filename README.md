@@ -317,7 +317,7 @@ bool Calculator::evaluate(const ProjectSpec& spec,
        - `"海上变电部分"` → `offshore_capex_total`
        - `"陆上变电部分"` → `onshore_capex_total`
        - `"线路部分"` → `line_capex_total`
-       - `"其他设备"` → `other_equipment_capex_total`
+       - `"其他设备及其他建筑安装工程"` → `other_equipment_capex_total`
      - 计算 `core_capex_total = 上述四项之和`；
      - 将这些值写入 `sch->sharedInputs[...]`。
 

@@ -61,7 +61,8 @@ static const char* kEmbeddedSpec = R"JSON(
         {"name":"length","label":"长度","type":"double","unit":"km","required":false,"defval":0},
         {"name":"circuits","label":"回路数","type":"int","unit":"回","required":false,"defval":0},
         {"name":"loss_hours","label":"损耗小时数","type":"double","unit":"h","required":false,"defval":0},
-        {"name":"price","label":"电价","type":"double","unit":"元/kWh","required":false,"defval":0,"sharedKey":"price"}
+        {"name":"price","label":"电价","type":"double","unit":"元/kWh","required":false,"defval":0,"sharedKey":"price"},
+        {"name":"override_result","label":"使用设定值","type":"double","unit":"万元/年","required":false}
       ],
       "formula":"result = resistance*current*current*2*length*circuits*loss_hours*price/1000.0/10000.0;" },
 
@@ -71,7 +72,8 @@ static const char* kEmbeddedSpec = R"JSON(
         {"name":"length","label":"长度","type":"double","unit":"km","required":false,"defval":0},
         {"name":"circuits","label":"回路数","type":"int","unit":"回","required":false,"defval":0},
         {"name":"loss_hours","label":"损耗小时数","type":"double","unit":"h","required":false,"defval":0},
-        {"name":"price","label":"电价","type":"double","unit":"元/kWh","required":false,"defval":0,"sharedKey":"price"}
+        {"name":"price","label":"电价","type":"double","unit":"元/kWh","required":false,"defval":0,"sharedKey":"price"},
+        {"name":"override_result","label":"使用设定值","type":"double","unit":"万元/年","required":false}
       ],
       "formula":"result = resistance*current*current*3*1.55*length*circuits*loss_hours*price/1000.0/10000.0;" },
 
@@ -79,20 +81,23 @@ static const char* kEmbeddedSpec = R"JSON(
         {"name":"transformer_capacity","label":"变压器输送容量","type":"double","unit":"MW","required":false,"defval":0},
         {"name":"valve_capacity","label":"换流阀输送容量","type":"double","unit":"MW","required":false,"defval":0},
         {"name":"loss_hours","label":"损耗小时数","type":"double","unit":"h","required":false,"defval":0},
-        {"name":"price","label":"电价","type":"double","unit":"元/kWh","required":false,"defval":0,"sharedKey":"price"}
+        {"name":"price","label":"电价","type":"double","unit":"元/kWh","required":false,"defval":0,"sharedKey":"price"},
+        {"name":"override_result","label":"使用设定值","type":"double","unit":"万元/年","required":false}
       ],
       "formula":"result = (transformer_capacity*0.003 *2 + valve_capacity*0.008)*loss_hours*price/10.0 ;" },
 
     { "id":"loss_reactor", "group":"损耗费用", "label":"高抗损耗", "unit":"万元/年", "inputs":[
         {"name":"charge_power","label":"充电功率","type":"double","unit":"Mvar","required":false,"defval":0},
         {"name":"loss_hours","label":"损耗小时数","type":"double","unit":"h","required":false,"defval":0},
-        {"name":"price","label":"电价","type":"double","unit":"元/kWh","required":false,"defval":0,"sharedKey":"price"}
+        {"name":"price","label":"电价","type":"double","unit":"元/kWh","required":false,"defval":0,"sharedKey":"price"},
+        {"name":"override_result","label":"使用设定值","type":"double","unit":"万元/年","required":false}
       ],
       "formula":"result = charge_power*0.6*0.001*loss_hours * price / 10.0;" },
 
     { "id":"om_substation_equipment", "group":"维护费", "label":"变电设备维护费", "unit":"万元/年", "inputs":[
         {"name":"offshore_rate","label":"海上设备折算倍率","type":"double","unit":"倍","required":false,"defval":0.02},
-        {"name":"onshore_rate","label":"陆上设备折算倍率","type":"double","unit":"倍","required":false,"defval":0.02}
+        {"name":"onshore_rate","label":"陆上设备折算倍率","type":"double","unit":"倍","required":false,"defval":0.02},
+        {"name":"override_result","label":"使用设定值","type":"double","unit":"万元/年","required":false}
       ],
       "formula":"result = (offshore_capex_total * offshore_rate) + (onshore_capex_total * onshore_rate);" },
 
@@ -101,7 +106,8 @@ static const char* kEmbeddedSpec = R"JSON(
         {"name":"length","label":"海缆长度","type":"double","unit":"km","required":false,"defval":0},
         {"name":"terminals","label":"终端数量","type":"int","unit":"个","required":false,"defval":0},
         {"name":"avg_power","label":"年平均功率","type":"double","unit":"MW","required":false,"defval":0},
-        {"name":"price","label":"电价","type":"double","unit":"元/kWh","required":false,"defval":0,"sharedKey":"price"}
+        {"name":"price","label":"电价","type":"double","unit":"元/kWh","required":false,"defval":0,"sharedKey":"price"},
+        {"name":"override_result","label":"使用设定值","type":"double","unit":"万元/年","required":false}
       ],
       "formula":"result = (0.03*length/100 + 0.007*terminals/100 + 0.0189)*avg_power*use_hours*0.1808*price/10.0;" },
 
@@ -110,20 +116,23 @@ static const char* kEmbeddedSpec = R"JSON(
         {"name":"length2","label":"海缆长度","type":"double","unit":"km","required":false,"defval":0},
         {"name":"terminals2","label":"终端数量","type":"int","unit":"个","required":false,"defval":0},
         {"name":"avg_power2","label":"年平均功率","type":"double","unit":"MW","required":false,"defval":0},
-        {"name":"price","label":"电价","type":"double","unit":"元/kWh","required":false,"defval":0,"sharedKey":"price"}
+        {"name":"price","label":"电价","type":"double","unit":"元/kWh","required":false,"defval":0,"sharedKey":"price"},
+        {"name":"override_result","label":"使用设定值","type":"double","unit":"万元/年","required":false}
       ],
       "formula":"result = (0.03*length2/100 + 0.007*terminals2/100 + 0.0189)*avg_power2*use_hours2*0.1808*price/10.0;" },
 
     { "id":"downtime_equipment", "group":"停运损失费", "label":"设备故障停运", "unit":"万元/年", "inputs":[
         {"name":"avg_power","label":"年平均功率","type":"double","unit":"MW","required":false,"defval":0},
-        {"name":"price","label":"电价","type":"double","unit":"元/kWh","required":false,"defval":0,"sharedKey":"price"}
+        {"name":"price","label":"电价","type":"double","unit":"元/kWh","required":false,"defval":0,"sharedKey":"price"},
+        {"name":"override_result","label":"使用设定值","type":"double","unit":"万元/年","required":false}
       ],
       "formula":"result = avg_power*44*price/10.0 ;" },
 
     { "id":"downtime_maintenance", "group":"停运损失费", "label":"设备计划检修停运", "unit":"万元/年", "inputs":[
         {"name":"avg_power","label":"年平均功率","type":"double","unit":"MW","required":false,"defval":0},
         {"name":"maint_hours","label":"计划检修时长","type":"double","unit":"h","required":false,"defval":0},
-        {"name":"price","label":"电价","type":"double","unit":"元/kWh","required":false,"defval":0,"sharedKey":"price"}
+        {"name":"price","label":"电价","type":"double","unit":"元/kWh","required":false,"defval":0,"sharedKey":"price"},
+        {"name":"override_result","label":"使用设定值","type":"double","unit":"万元/年","required":false}
       ],
       "formula":"result = avg_power*maint_hours*price/10.0;" },
 
@@ -132,13 +141,15 @@ static const char* kEmbeddedSpec = R"JSON(
         {"name":"dc_width","label":"直流用海宽度","type":"double","unit":"m","required":false,"defval":0},
         {"name":"ac_length","label":"交流海缆长度","type":"double","unit":"km","required":false,"defval":0},
         {"name":"ac_width","label":"交流用海宽度","type":"double","unit":"m","required":false,"defval":0},
-        {"name":"unit_fee","label":"单公顷费用","type":"double","unit":"万元/年","required":false,"defval":0}
+        {"name":"unit_fee","label":"单公顷费用","type":"double","unit":"万元/年","required":false,"defval":0},
+        {"name":"override_result","label":"使用设定值","type":"double","unit":"万元/年","required":false}
       ],
       "formula":"result = (dc_length*dc_width + ac_length*ac_width) * unit_fee / 10.0;" },
 
     { "id":"rent_equipment", "group":"海域租赁费", "label":"设备年海域使用费", "unit":"万元/年", "inputs":[
         {"name":"area","label":"面积","type":"double","unit":"m²","required":false,"defval":0},
-        {"name":"unit_fee","label":"单公顷费用","type":"double","unit":"万元/年","required":false,"defval":0}
+        {"name":"unit_fee","label":"单公顷费用","type":"double","unit":"万元/年","required":false,"defval":0},
+        {"name":"override_result","label":"使用设定值","type":"double","unit":"万元/年","required":false}
       ],
       "formula":"result = area * unit_fee / 10000.0;" }
   ]

@@ -8,6 +8,21 @@ Calculator::Calculator() {
 
 bool Calculator::evaluate(const ProjectSpec& spec, const InputMap& inputs, double& out) const {
 
+    // 若存在“使用设定值”字段且非空，则直接采用该值作为结果
+    const auto overrideIt = inputs.find("override_result");
+    if (overrideIt != inputs.end()) {
+        const QString text = overrideIt.value().toString().trimmed();
+        if (!text.isEmpty()) {
+            bool ok = false;
+            const double v = text.toDouble(&ok);
+            if (!ok) {
+                return false;
+            }
+            out = v;
+            return true;
+        }
+    }
+
     QJSEngine eng;
     // 把输入注入JS 全局变量
     for (auto it = inputs.begin(); it != inputs.end(); ++it) {
