@@ -37,7 +37,7 @@ namespace {
 const QStringList& initialInvestGroups() {
     static const QStringList groups = {
         u8"海上变电部分", u8"陆上变电部分",
-        u8"线路部分", u8"其他设备", u8"其他费用"
+        u8"线路部分", u8"其他设备及其他建筑安装工程", u8"其他费用及基本预备费"
     };
     return groups;
 }
@@ -66,7 +66,7 @@ static void updateCapexTotals(const ProjectSpecSet& specSet, Scheme* sch) {
             onshore += val;
         } else if (spec.group == u8"线路部分") {
             line += val;
-        } else if (spec.group == u8"其他设备") {
+        } else if (spec.group == u8"其他设备及其他建筑安装工程") {
             otherEquip += val;
         }
     }
@@ -140,7 +140,7 @@ void MainWindow::initUi() {
     projectModel_ = new QStandardItemModel(this);
     buildProjectModel();
     projectView_->setModel(projectModel_);
-    projectView_->expandAll(); // ensure everything is expanded after the model is bound
+    projectView_->expandAll();
     projectView_->header()->setStretchLastSection(true);
     projectView_->setColumnWidth(0, 320); // 第一列：项目
     projectView_->setColumnWidth(1, 100); // 第二列：摘要/状态
@@ -181,7 +181,7 @@ void MainWindow::buildProjectModel() {
     const auto& initialGroups = initialInvestGroups();
     const auto& annualGroups = annualCostGroups();
     
-    // 二级分组（需要缩进显示的）
+    // 二级分组（缩进显示）
     QStringList subGroups = {u8"海上变电部分", u8"陆上变电部分"};
     
     // 添加"初期投资"标题行
@@ -222,7 +222,7 @@ void MainWindow::buildProjectModel() {
         
         QString displayName = s.label;
         
-        // 如果是二级分组，添加缩进
+        // 二级分组添加缩进
         if (subGroups.contains(s.group)) {
             displayName = "  " + displayName;
         }
@@ -436,7 +436,7 @@ void MainWindow::onEditChanged() {
     // 更新变电设备维护费所需的共享输入（分组总投资）
     updateCapexTotals(spec_, sch);
 
-    // 在新的总投资基础上重新计算“变电设备维护费”（若未编辑则使用默认倍率）
+    // 在新的总投资基础上重新计算“变电设备维护费”
     for (const auto& s : spec_.items) {
         if (s.id == "om_substation_equipment") {
             auto own = sch->inputs.value(s.id);
@@ -464,7 +464,7 @@ void MainWindow::onEditChanged() {
         }
     }
 
-    // 在新的总投资基础上重新计算“其他费用”（若未编辑则使用默认倍率）
+    // 在新的总投资基础上重新计算“其他费用”
     for (const auto& s : spec_.items) {
         if (s.id == "other_cost") {
             auto own = sch->inputs.value(s.id);

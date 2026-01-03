@@ -6,7 +6,7 @@
 
 static const char* kEmbeddedSpec = R"JSON(
 {
-  "groups": ["海上变电部分", "陆上变电部分", "线路部分", "其他设备", "其他费用",
+  "groups": ["海上变电部分", "陆上变电部分", "线路部分", "其他设备及其他建筑安装工程", "其他费用及基本预备费",
              "损耗费用", "维护费", "停运损失费", "海域租赁费"],
   "items": [
     { "id":"offshore_converter", "group":"海上变电部分", "label":"海上换流站", "unit":"万元", "inputs":[
@@ -45,12 +45,12 @@ static const char* kEmbeddedSpec = R"JSON(
       ],
       "formula":"result = (unit_price+100) * length;" },
 
-    { "id":"other_equipment", "group":"其他设备", "label":"其他设备", "unit":"万元", "inputs":[
-        {"name":"capex","label":"其他设备","type":"double","unit":"万元","required":false,"defval":0}
+    { "id":"other_equipment", "group":"其他设备及其他建筑安装工程", "label":"其他设备及其他建筑安装工程", "unit":"万元", "inputs":[
+        {"name":"capex","label":"其他设备及其他建筑安装工程","type":"double","unit":"万元","required":false,"defval":0}
       ],
       "formula":"result = capex;" },
 
-    { "id":"other_cost", "group":"其他费用", "label":"其他费用", "unit":"万元", "inputs":[
+    { "id":"other_cost", "group":"其他费用及基本预备费", "label":"其他费用及基本预备费", "unit":"万元", "inputs":[
         {"name":"rate","label":"折算倍率","type":"double","unit":"倍","required":false,"defval":0.08}
       ],
       "formula":"result = core_capex_total * rate;" },
@@ -111,7 +111,7 @@ static const char* kEmbeddedSpec = R"JSON(
       ],
       "formula":"result = (0.03*length/100 + 0.007*terminals/100 + 0.0189)*avg_power*use_hours*0.1808*price/10.0;" },
 
-      { "id":"downtime_cable2", "group":"停运损失费", "label":"交流海缆故障停运", "unit":"万元/年", "inputs":[
+    { "id":"downtime_cable2", "group":"停运损失费", "label":"交流海缆故障停运", "unit":"万元/年", "inputs":[
         {"name":"use_hours2","label":"年利用小时数","type":"double","unit":"h","required":false,"defval":0},
         {"name":"length2","label":"海缆长度","type":"double","unit":"km","required":false,"defval":0},
         {"name":"terminals2","label":"终端数量","type":"int","unit":"个","required":false,"defval":0},
@@ -123,10 +123,11 @@ static const char* kEmbeddedSpec = R"JSON(
 
     { "id":"downtime_equipment", "group":"停运损失费", "label":"设备故障停运", "unit":"万元/年", "inputs":[
         {"name":"avg_power","label":"年平均功率","type":"double","unit":"MW","required":false,"defval":0},
+        {"name":"maintain_hours","label":"故障维修时长","type":"double","unit":"h","required":false,"defval":0},
         {"name":"price","label":"电价","type":"double","unit":"元/kWh","required":false,"defval":0,"sharedKey":"price"},
         {"name":"override_result","label":"使用设定值","type":"double","unit":"万元/年","required":false}
       ],
-      "formula":"result = avg_power*44*price/10.0 ;" },
+      "formula":"result = avg_power*maintain_hours*price/10.0 ;" },
 
     { "id":"downtime_maintenance", "group":"停运损失费", "label":"设备计划检修停运", "unit":"万元/年", "inputs":[
         {"name":"avg_power","label":"年平均功率","type":"double","unit":"MW","required":false,"defval":0},
@@ -136,17 +137,23 @@ static const char* kEmbeddedSpec = R"JSON(
       ],
       "formula":"result = avg_power*maint_hours*price/10.0;" },
 
-    { "id":"rent_cable", "group":"海域租赁费", "label":"线路年海域使用费", "unit":"万元/年", "inputs":[
+    { "id":"rent_cable1", "group":"海域租赁费", "label":"直流海缆年海域使用费", "unit":"万元/年", "inputs":[
         {"name":"dc_length","label":"直流海缆长度","type":"double","unit":"km","required":false,"defval":0},
         {"name":"dc_width","label":"直流用海宽度","type":"double","unit":"m","required":false,"defval":0},
+        {"name":"unit_fee","label":"单公顷费用","type":"double","unit":"万元/年","required":false,"defval":0},
+        {"name":"override_result","label":"使用设定值","type":"double","unit":"万元/年","required":false}
+      ],
+      "formula":"result = dc_length*dc_width * unit_fee / 10.0;" },
+
+    { "id":"rent_cable2", "group":"海域租赁费", "label":"交流海缆年海域使用费", "unit":"万元/年", "inputs":[
         {"name":"ac_length","label":"交流海缆长度","type":"double","unit":"km","required":false,"defval":0},
         {"name":"ac_width","label":"交流用海宽度","type":"double","unit":"m","required":false,"defval":0},
         {"name":"unit_fee","label":"单公顷费用","type":"double","unit":"万元/年","required":false,"defval":0},
         {"name":"override_result","label":"使用设定值","type":"double","unit":"万元/年","required":false}
       ],
-      "formula":"result = (dc_length*dc_width + ac_length*ac_width) * unit_fee / 10.0;" },
-
-    { "id":"rent_equipment", "group":"海域租赁费", "label":"设备年海域使用费", "unit":"万元/年", "inputs":[
+      "formula":"result = ac_length*ac_width * unit_fee / 10.0;" },
+    
+    { "id":"rent_equipment", "group":"海域租赁费", "label":"平台年海域使用费", "unit":"万元/年", "inputs":[
         {"name":"area","label":"面积","type":"double","unit":"m²","required":false,"defval":0},
         {"name":"unit_fee","label":"单公顷费用","type":"double","unit":"万元/年","required":false,"defval":0},
         {"name":"override_result","label":"使用设定值","type":"double","unit":"万元/年","required":false}

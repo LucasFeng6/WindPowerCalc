@@ -3,7 +3,7 @@
 #include <QJSValue>
 
 Calculator::Calculator() {
-    // 示例：可以在此注册极复杂项目的回调（默认本版本全部走表达式）
+    // 可在此注册极复杂项目的回调（默认本版本全部走表达式）
 }
 
 bool Calculator::evaluate(const ProjectSpec& spec, const InputMap& inputs, double& out) const {
