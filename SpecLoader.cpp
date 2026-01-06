@@ -1,9 +1,14 @@
+/*
+ * 规格加载模块实现。
+ * 从内嵌 JSON 描述构建 ProjectSpecSet 供界面和计算使用。
+ */
 #include "SpecLoader.h"
 #include <QJsonDocument>
 #include <QJsonObject>
 #include <QJsonArray>
 #include <QVariant>
 
+/* 内嵌默认规格 JSON，描述所有项目及其输入字段和公式 */
 static const char* kEmbeddedSpec = R"JSON(
 {
   "groups": ["海上变电部分", "陆上变电部分", "线路部分", "其他设备及其他建筑安装工程", "其他费用及基本预备费",
@@ -40,10 +45,11 @@ static const char* kEmbeddedSpec = R"JSON(
       "formula":"result = capex;" },
 
     { "id":"subsea_cable", "group":"线路部分", "label":"海缆费用", "unit":"万元", "inputs":[
-        {"name":"unit_price","label":"单价","type":"double","unit":"万元/km","required":false,"defval":0},
+        {"name":"unit_price","label":"本体单价","type":"double","unit":"万元/km","required":false,"defval":0},
+        {"name":"unit_price2","label":"施工单价","type":"double","unit":"万元/km","required":false,"defval":0},
         {"name":"length","label":"长度","type":"double","unit":"km","required":false,"defval":0}
       ],
-      "formula":"result = (unit_price+100) * length;" },
+      "formula":"result = (unit_price+unit_price2) * length;" },
 
     { "id":"other_equipment", "group":"其他设备及其他建筑安装工程", "label":"其他设备及其他建筑安装工程", "unit":"万元", "inputs":[
         {"name":"capex","label":"其他设备及其他建筑安装工程","type":"double","unit":"万元","required":false,"defval":0}
@@ -161,8 +167,9 @@ static const char* kEmbeddedSpec = R"JSON(
       "formula":"result = area * unit_fee / 10000.0;" }
   ]
 }
-)JSON";
+ )JSON";
 
+// 从单个 JSON 对象解析出 ProjectSpec 以及其输入字段列表
 static ProjectSpec parseItem(const QJsonObject& o) {
     ProjectSpec s;
     s.id = o.value("id").toString();
@@ -190,6 +197,7 @@ static ProjectSpec parseItem(const QJsonObject& o) {
     return s;
 }
 
+// 加载内嵌的默认规格，填充分组顺序、项目列表及分组到行索引的映射
 ProjectSpecSet SpecLoader::loadDefault() {
     ProjectSpecSet set;
     const auto doc = QJsonDocument::fromJson(QByteArray(kEmbeddedSpec));

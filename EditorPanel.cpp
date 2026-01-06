@@ -1,3 +1,7 @@
+/*
+ * 参数编辑面板实现
+ * 根据 ProjectSpec 动态构建右侧输入表单，负责输入收集与校验
+ */
 #include "EditorPanel.h"
 
 #include <QFormLayout>
@@ -15,6 +19,7 @@
 #include <algorithm>
 #include <cmath>
 
+// 构造编辑面板，初始化标题、说明区域和表单布局
 EditorPanel::EditorPanel(QWidget* parent): QWidget(parent) {
     auto* lay = new QVBoxLayout(this);
 
@@ -42,6 +47,7 @@ EditorPanel::EditorPanel(QWidget* parent): QWidget(parent) {
     setLayout(lay);
 }
 
+// 清空表单及字段缓存
 void EditorPanel::clearForm() {
     while (QLayoutItem* item = form_->takeAt(0)) {
         if (auto* w = item->widget()) w->deleteLater();
@@ -50,6 +56,7 @@ void EditorPanel::clearForm() {
     fields_.clear();
 }
 
+// 输入字段编辑框创建及初始化,带数值校验
 QWidget* EditorPanel::makeWidget(const InputField& f, const QVariant& def, bool hasValue) const {
     auto* edit = new QLineEdit;
     edit->setAlignment(Qt::AlignRight | Qt::AlignVCenter);
@@ -82,6 +89,7 @@ QWidget* EditorPanel::makeWidget(const InputField& f, const QVariant& def, bool 
     return edit;
 }
 
+// 根据项目规格重建表单
 void EditorPanel::setProject(const ProjectSpec& spec, const QMap<QString,QVariant>& curInputs,
                              const QMap<QString,QVariant>& sharedInputs) {
     clearForm();
@@ -131,12 +139,14 @@ QVariant EditorPanel::widgetValue(const FieldWidget& fw) const {
     return {};
 }
 
+// 校验必填字段是否已填写
 bool EditorPanel::checkRequired(const FieldWidget& fw) const {
     if (!fw.f.required) return true;
     const QVariant v = widgetValue(fw);
     return !v.toString().trimmed().isEmpty();
 }
 
+// 收集全部控件的输入值，按自有/共享输出；若有必填项缺失给出错误信息
 bool EditorPanel::collectInputs(QMap<QString,QVariant>& ownOut, QMap<QString,QVariant>& sharedOut, QString* err) const {
     ownOut.clear();
     sharedOut.clear();
@@ -161,6 +171,8 @@ bool EditorPanel::collectInputs(QMap<QString,QVariant>& ownOut, QMap<QString,QVa
     return true;
 }
 
+/* ====== 便捷数据录入 ====== */
+// 将光标移动到第一个可编辑输入框，并选中文本
 void EditorPanel::focusFirstField() {
     for (const auto& fw : fields_) {
         if (auto* edit = qobject_cast<QLineEdit*>(fw.w)) {
@@ -171,6 +183,7 @@ void EditorPanel::focusFirstField() {
     }
 }
 
+// 将光标移动到后一个可编辑字段
 bool EditorPanel::focusNextField(QLineEdit* current) {
     if (!current) return false;
     for (int i = 0; i < fields_.size(); ++i) {
@@ -188,6 +201,7 @@ bool EditorPanel::focusNextField(QLineEdit* current) {
     return false;
 }
 
+// 回车跳转，键盘事件拦截
 bool EditorPanel::eventFilter(QObject* obj, QEvent* event) {
     if (event->type() == QEvent::KeyPress) {
         if (auto* edit = qobject_cast<QLineEdit*>(obj)) {

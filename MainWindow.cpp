@@ -33,6 +33,7 @@
 #include <QDialogButtonBox>
 #include <cmath>
 
+/* 投资/费用分组及共享输入汇总等内部工具函数 */
 namespace {
 const QStringList& initialInvestGroups() {
     static const QStringList groups = {
@@ -87,6 +88,7 @@ MainWindow::MainWindow(QWidget* parent): QMainWindow(parent) {
     addScheme();
 }
 
+// 整体UI初始化，工具栏、方案列表、项目树和结果表
 void MainWindow::initUi() {
     setWindowTitle(u8"海上风电送出经济比较");
 
@@ -168,6 +170,7 @@ void MainWindow::initUi() {
     resize(1200, 720);
 }
 
+// 根据规格定义构建项目树模型及各项目摘要项映射
 void MainWindow::buildProjectModel() {
     projectModel_->clear();
     projectModel_->setHorizontalHeaderLabels({u8"项目", u8"小计 / 状态"});
@@ -280,6 +283,7 @@ void MainWindow::buildProjectModel() {
     }
 }
 
+/* ====== 索引相关函数 ====== */
 int MainWindow::currentSchemeIndex() const {
     return schemesList_->currentRow();
 }
@@ -301,6 +305,8 @@ const ProjectSpec* MainWindow::projectSpecFromIndex(const QModelIndex& idx) cons
     return &spec_.items[rowId];
 }
 
+/* ====== 方案相关函数 ====== */
+// 新增默认方案
 void MainWindow::addScheme() {
     static int counter = 1;
     Scheme sch;
@@ -310,6 +316,7 @@ void MainWindow::addScheme() {
     schemesList_->setCurrentRow(schemes_.size() - 1);
 }
 
+// 复制方案
 void MainWindow::duplicateScheme() {
     Scheme* cur = currentScheme();
     if (!cur) {
@@ -323,6 +330,7 @@ void MainWindow::duplicateScheme() {
     schemesList_->setCurrentRow(schemes_.size() - 1);
 }
 
+// 删除方案
 void MainWindow::removeScheme() {
     int idx = currentSchemeIndex();
     if (idx < 0) return;
@@ -337,6 +345,7 @@ void MainWindow::removeScheme() {
     delete schemesList_->takeItem(idx);
 }
 
+// 方案列表变化响应
 void MainWindow::onSchemeListChanged(int idx) {
     if (idx < 0 || idx >= schemes_.size()) return;
     // 刷新项目树的摘要列
@@ -345,6 +354,7 @@ void MainWindow::onSchemeListChanged(int idx) {
     onProjectSelectionChanged();
 }
 
+// 方案重命名
 void MainWindow::onSchemeItemDoubleClicked() {
     int idx = currentSchemeIndex();
     if (idx < 0 || idx >= schemes_.size()) return;
@@ -361,6 +371,7 @@ void MainWindow::onSchemeItemDoubleClicked() {
     }
 }
 
+// 项目树选择变化响应
 void MainWindow::onProjectSelectionChanged() {
     const QModelIndex idx = projectView_->currentIndex();
     const ProjectSpec* spec = projectSpecFromIndex(idx);
@@ -377,6 +388,9 @@ void MainWindow::onProjectSelectionChanged() {
     editor_->focusFirstField();
     refreshProjectSummaries();
 }
+
+// 编辑面板内容变更响应 保存输入、重新计算结果并更新摘要
+/* ====== 编辑面板内容变更响应 ====== */
 void MainWindow::onEditChanged() {
     const QModelIndex idx = projectView_->currentIndex();
     const ProjectSpec* spec = projectSpecFromIndex(idx);
@@ -408,7 +422,7 @@ void MainWindow::onEditChanged() {
         return all;
     };
 
-    // 当前项目重新计算
+    // 计算项目结果
     {
         double result = 0.0;
         const auto allInputs = mergedInputs(spec->id);
@@ -419,7 +433,7 @@ void MainWindow::onEditChanged() {
         }
     }
 
-    // 共享输入改变后，重新计算其他已填写项目
+    // 共享输入变更响应
     for (const auto& s : spec_.items) {
         if (s.id == spec->id) continue;
         const auto own = sch->inputs.value(s.id);
@@ -433,7 +447,7 @@ void MainWindow::onEditChanged() {
         }
     }
 
-    // 更新变电设备维护费所需的共享输入（分组总投资）
+    // 更新变电设备维护费所需共享输入
     updateCapexTotals(spec_, sch);
 
     // 在新的总投资基础上重新计算“变电设备维护费”
@@ -495,6 +509,7 @@ void MainWindow::onEditChanged() {
     refreshProjectSummaries();
 }
 
+// 刷新方案分组小计及项目树摘要列
 void MainWindow::refreshProjectSummaries() {
     Scheme* sch = currentScheme();
     const auto& initialGroups = initialInvestGroups();
@@ -593,6 +608,8 @@ void MainWindow::refreshProjectSummaries() {
     }
 }
 
+/* ====== 汇总结果生成与结果表构建 ====== */
+// 汇总结果生成触发
 void MainWindow::onGenerate() {
     if (schemes_.isEmpty()) return;
     
@@ -603,6 +620,7 @@ void MainWindow::onGenerate() {
     setStatusInfo(QString(u8"已生成 %1 个方案的汇总").arg(schemes_.size()));
 }
 
+// 重建汇总结果表头
 void MainWindow::rebuildResultHeader() {
     resultModel_->clear();
     QStringList headers;
@@ -619,6 +637,7 @@ void MainWindow::rebuildResultHeader() {
 }
 
 
+// 根据所有方案计算结果构建初期投资、年运行费及汇总行
 void MainWindow::rebuildResultBody() {
     resultModel_->removeRows(0, resultModel_->rowCount());
     
@@ -847,10 +866,13 @@ void MainWindow::rebuildResultBody() {
 }
 
 
+// 状态栏提示信息显示
 void MainWindow::setStatusInfo(const QString& msg, int timeoutMs) {
     statusBar()->showMessage(msg, timeoutMs);
 }
 
+/* ====== 方案集保存与加载（JSON 格式） ====== */
+// 方案集合保存
 void MainWindow::onSave() {
     QString path = QFileDialog::getSaveFileName(this, u8"保存方案集", "", "JSON (*.json)");
     if (path.isEmpty()) return;
@@ -903,6 +925,7 @@ void MainWindow::onSave() {
     setStatusInfo(u8"已保存方案集");
 }
 
+// 方案集加载
 void MainWindow::onLoad() {
     QString path = QFileDialog::getOpenFileName(this, u8"加载方案集", "", "JSON (*.json)");
     if (path.isEmpty()) return;
@@ -970,6 +993,7 @@ void MainWindow::onLoad() {
     setStatusInfo(QString(u8"已加载 %1 个方案").arg(schemes_.size()));
 }
 
+/* ====== 汇总结果Excel导出 ====== */
 void MainWindow::onExportExcel() {
     if (schemes_.isEmpty()) {   //
         QMessageBox::information(this, u8"提示", u8"请先创建至少一个方案");
@@ -1077,6 +1101,7 @@ void MainWindow::onExportExcel() {
     QMessageBox::information(this, u8"导出成功", u8"成功导出到"+path);
 }
 
+/* ====== 经济参数编辑对话框 ====== */
 void MainWindow::onEditEconomicParams() {
     QDialog dlg(this);
     dlg.setWindowTitle(u8"经济参数");
